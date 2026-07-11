@@ -60,6 +60,16 @@
   letter-spacing: -1.5px;
 }
 
+.VPHomeHero .name {
+  font-size: 46px;
+  line-height: 1.08;
+}
+
+.VPHomeHero .text {
+  font-size: 46px;
+  line-height: 1.18;
+}
+
 .VPHomeHero .tagline {
   max-width: 720px;
   line-height: 1.75;
@@ -93,8 +103,9 @@
 }
 
 .VPNavBarTitle .logo {
-  width: 32px;
-  height: 36px;
+  width: 156px;
+  height: auto;
+  max-height: 42px;
 }
 
 .VPHomeFeatures .item {
@@ -170,6 +181,14 @@
   .VPHomeHero .image-src {
     max-width: 144px;
     max-height: 166px;
+  }
+
+  .VPHomeHero .name {
+    font-size: 32px;
+  }
+
+  .VPHomeHero .text {
+    font-size: 30px;
   }
 
   .home-banner {

@@ -21,7 +21,7 @@ export default defineConfig({
   ],
   themeConfig: {
     siteTitle: false,
-    logo: "/logo-mark.png",
+    logo: "/logo-wide-transparent.png",
     search: {
       provider: "local",
     },
