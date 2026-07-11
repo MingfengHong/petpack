@@ -1,7 +1,7 @@
 # PetPack Studio 0.3.1 测试报告
 
 测试日期：2026-07-11
-结论：Windows x64 Release、NSIS 安装包、Studio 导出的独立桌宠、轻量 builder 接力链路和 Docker Web API 均通过可在本机完成的测试。macOS 与 Linux 已配置原生构建矩阵，但本报告不把 Windows 上的编译结果冒充两种平台的原生运行验收。
+结论：Windows x64 Release、NSIS 安装包、Studio 导出的独立桌宠、轻量 builder 接力链路、Docker Web API 和 Linux x64 AppImage/DEB 均通过可在本机完成的测试。Linux 已在 Ubuntu 26.04 LTS x86_64 上完成原生构建、依赖检查和启动探测；macOS 已配置原生构建矩阵，但本报告不把其他平台的编译结果冒充 macOS 原生运行验收。
 
 ## 测试环境
 
@@ -10,6 +10,10 @@
 - Rust/Cargo 1.97.0
 - Tauri 2、WebView2、200% 显示缩放环境
 - 输入：`pet-example/luofulai`、Petdex `boba`、同一宠物 ZIP
+- Ubuntu 26.04 LTS x86_64，kernel 7.0.0-27-generic
+- Linux Node.js 22.22.1，npm 9.2.0，Rust/Cargo 1.93.1
+- Linux Tauri 依赖：GTK 3、WebKitGTK 4.1、Ayatana AppIndicator、librsvg、patchelf、FUSE 2 兼容库
+- Linux 图形会话：`DISPLAY=:0`、`WAYLAND_DISPLAY=wayland-0`
 
 ## 本轮缺陷与修复
 
@@ -35,11 +39,40 @@
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | GitHub Actions YAML 解析 | 3 个 workflow 全部通过 |
 | `docker compose config` | 通过 |
-| Rust release + NSIS | 通过 |
+| Windows Rust release + NSIS | 通过 |
+| Linux AppImage + DEB 原生打包 | 通过 |
+| Linux release binary / AppImage 启动探测 | 通过 |
 
 0.3.1 真实 Studio 窗口额外验证：Windows 平台标签和按钮文案正确；未导入时两种发布按钮均禁用；导入 `luofulai` 后字段可编辑、按钮启用、状态变为“可以发布”；从新版界面生成 Windows 桌宠成功，当前平台卡片进入完成状态并显示 ZIP 路径与“打开输出文件夹”。
 
 Rust 回归覆盖父目录单宠物解析、清单路径穿越、错误图集、嵌套 ZIP、ZIP 路径穿越/多宠物、Codex v2 样例、自包含导出、跨平台接力包和高 DPI/非零显示器原点窗口定位。
+
+## Linux 本机验收
+
+本轮在 Ubuntu 26.04 LTS x86_64 上补齐 Rust/Cargo 和 Tauri Linux 构建依赖后完成原生验证。首次 Rust 编译时 `/tmp` tmpfs 配额不足导致 `rustc` 临时文件写入失败；将 `TMPDIR` 指向仓库内 `.tmp` 后，代码和打包流程均正常通过。该问题属于本机测试环境限制，不需要项目代码修复。
+
+| 项目 | 方法与证据 | 结果 |
+| --- | --- | --- |
+| TypeScript 与 Rust 回归 | `env TMPDIR=/home/hyacinth/petpack/.tmp npm test` | 11 passed，0 failed，1 ignored |
+| Petdex 联网测试 | `cargo test ... downloads_the_petdex_boba_package -- --ignored` | 1 passed，0 failed |
+| Linux 打包 | `env TMPDIR=/home/hyacinth/petpack/.tmp npm run tauri build -- --bundles appimage,deb --ci` | 生成 AppImage 与 DEB |
+| 动态依赖 | `ldd src-tauri/target/release/petpack-studio` | 无 `not found` 依赖 |
+| DEB 元数据 | `dpkg-deb --field ... Package Version Architecture Depends` | `pet-pack-studio` 0.3.1，amd64，依赖 `libayatana-appindicator3-1`、`libwebkit2gtk-4.1-0`、`libgtk-3-0` |
+| DEB 包内容 | `dpkg-deb -c` / `dpkg-deb --info` | 包含 `/usr/bin/petpack-studio`、桌面入口和 32/128/256@2 图标 |
+| DEB 安装 | `pkexec /usr/bin/dpkg -i ...` 后 `dpkg -s pet-pack-studio` | `install ok installed`，版本 0.3.1，amd64 |
+| 桌面入口 | `desktop-file-validate /usr/share/applications/PetPack Studio.desktop` | 通过，无校验错误 |
+| 启动探测 | `timeout 8` 分别启动 release binary 与 AppImage | 二者均保持运行至超时，无 stderr 崩溃输出 |
+| 安装版启动 | `timeout 8 /usr/bin/petpack-studio` | 保持运行至超时，无 stderr 崩溃输出 |
+| 进程清理 | `pgrep -af petpack-studio` | 无残留进程 |
+| DEB 卸载 | `pkexec /usr/bin/dpkg -r pet-pack-studio` 后复查 | 包、`/usr/bin/petpack-studio` 和桌面入口均已移除 |
+
+Linux 产物：
+
+| 产物 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| `PetPack Studio_0.3.1_amd64.AppImage` | 85,789,176 | `6BC64B5213BCA297E8D579F90F53C2C0CA364624C936E5899536F57F28FF3FE4` |
+| `PetPack Studio_0.3.1_amd64.deb` | 6,300,164 | `45ACCA470013C8E82E65DE87F74F16355F08D767639189D242368D343A4FA7B2` |
+| `petpack-studio` | 17,447,984 | `78ABCEC7904C2D4719FF839B7320449DCC18F15B037BC2642544A00C91D13B7D` |
 
 ## 最终 Windows 桌宠实测
 
@@ -104,7 +137,10 @@ Rust 回归覆盖父目录单宠物解析、清单路径穿越、错误图集、
 | `PetPack Studio_0.3.1_x64-setup.exe` | 3,340,869 | `8298FC2B490353E8B3E0CFD8CE1D74F3194BB43729D7BF76D3DFCEE92BB3AE18` |
 | `luofulai-desktop-pet-windows-x64.zip` | 6,731,180 | `11C388D9F19F427495DDB8468B12096BBFE767C5FFAF70DEF02B0BDC13B7EBB2` |
 | `luofulai.exe` | 13,586,944 | `28318C8CBF0B5D55DFF670A4B7EA60A1AAA60D809D008529151E5E0395855B24` |
+| `PetPack Studio_0.3.1_amd64.AppImage` | 85,789,176 | `6BC64B5213BCA297E8D579F90F53C2C0CA364624C936E5899536F57F28FF3FE4` |
+| `PetPack Studio_0.3.1_amd64.deb` | 6,300,164 | `45ACCA470013C8E82E65DE87F74F16355F08D767639189D242368D343A4FA7B2` |
+| `petpack-studio` Linux x64 release binary | 17,447,984 | `78ABCEC7904C2D4719FF839B7320449DCC18F15B037BC2642544A00C91D13B7D` |
 
 ## 尚需目标平台验收的边界
 
-macOS/Linux 窗口使用同一逻辑尺寸、DPI 转换、缩放、拖动和边界夹取代码，并在原生 runner 上构建。但透明窗口、托盘和窗口管理器行为最终仍应在真实 macOS 与主流 Linux 桌面上验收；代码签名、公证和发行版打包也必须在对应平台完成。
+macOS 窗口使用同一逻辑尺寸、DPI 转换、缩放、拖动和边界夹取代码，并在原生 runner 上构建。但透明窗口、托盘和窗口管理器行为最终仍应在真实 macOS 上验收；代码签名、公证也必须在 macOS 完成。Linux 已在 Ubuntu 26.04 LTS 上完成 AppImage/DEB 构建和启动探测，仍建议在目标发行版与桌面环境上补充安装、托盘和窗口管理器验收。
