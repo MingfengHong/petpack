@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="PetPack Studio" width="640">
+  <img src="docs/assets/logo-compact.png" alt="PetPack Studio" width="640">
 </p>
 
 <p align="center">

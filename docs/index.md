@@ -6,8 +6,8 @@ hero:
   text: 让你的 Codex 宠物走出 Codex
   tagline: 导入、校验并预览 Codex 或 Petdex 宠物，将它打包成不依赖 Codex 的 Windows、macOS 和 Linux 独立桌宠。
   image:
-    src: /logo.png
-    alt: PetPack Studio
+    src: /logo-mark.png
+    alt: PetPack Studio 图标
   actions:
     - theme: brand
       text: 下载 0.3.1

@@ -40,17 +40,18 @@
 .VPHomeHero .container {
   display: flex;
   max-width: 1120px;
-  flex-direction: column-reverse;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: 32px;
-  text-align: center;
+  justify-content: center;
+  gap: 72px;
+  text-align: left;
 }
 
 .VPHomeHero .main {
   display: flex;
-  max-width: 780px;
+  max-width: 720px;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .VPHomeHero .name,
@@ -65,30 +66,35 @@
 }
 
 .VPHomeHero .actions {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .VPHomeHero .image {
-  order: 2;
-  width: min(720px, 86vw);
+  flex: 0 0 250px;
+  width: 250px;
   height: auto;
 }
 
 .VPHomeHero .image-container {
   position: static;
-  width: 100%;
-  height: auto;
+  width: 250px;
+  height: 290px;
   transform: none;
 }
 
 .VPHomeHero .image-src {
   position: static;
   width: 100%;
-  max-width: 720px;
-  max-height: 240px;
+  max-width: 250px;
+  max-height: 290px;
   object-fit: contain;
   transform: none;
   filter: none;
+}
+
+.VPNavBarTitle .logo {
+  width: 32px;
+  height: 36px;
 }
 
 .VPHomeFeatures .item {
@@ -140,8 +146,30 @@
     padding-top: 44px !important;
   }
 
+  .VPHomeHero .container {
+    flex-direction: column;
+    gap: 24px;
+    text-align: center;
+  }
+
+  .VPHomeHero .main {
+    align-items: center;
+  }
+
+  .VPHomeHero .actions {
+    justify-content: center;
+  }
+
+  .VPHomeHero .image,
+  .VPHomeHero .image-container {
+    width: 144px;
+    height: 166px;
+    flex-basis: 144px;
+  }
+
   .VPHomeHero .image-src {
-    max-height: 150px;
+    max-width: 144px;
+    max-height: 166px;
   }
 
   .home-banner {

@@ -13,15 +13,15 @@ export default defineConfig({
     lineNumbers: true,
   },
   head: [
-    ["link", { rel: "icon", href: `${base}logo.png` }],
+    ["link", { rel: "icon", href: `${base}logo-mark.png` }],
     ["meta", { name: "theme-color", content: "#f3efe7" }],
     ["meta", { property: "og:title", content: "PetPack Studio Docs" }],
     ["meta", { property: "og:description", content: "让你的 Codex 宠物走出 Codex。" }],
     ["meta", { property: "og:image", content: `${base}banner.png` }],
   ],
   themeConfig: {
-    siteTitle: "PetPack Studio Docs",
-    logo: "/logo.png",
+    siteTitle: false,
+    logo: "/logo-mark.png",
     search: {
       provider: "local",
     },
