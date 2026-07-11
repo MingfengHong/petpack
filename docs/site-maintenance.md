@@ -17,8 +17,7 @@ PetPack 文档站使用 VitePress 构建。源码和发布产物分开管理：
 - `docs/CROSS_PLATFORM.md`：跨平台分发和 Release；
 - `docs/DOCKER.md`：Web Studio 部署；
 - `docs/development.md`：开发、测试和构建；
-- `docs/troubleshooting.md`：用户排错；
-- `docs/TEST_REPORT.md`：版本测试证据。
+- `docs/troubleshooting.md`：用户排错。
 
 ## 发布规则
 
@@ -49,7 +48,7 @@ npm run docs:build
 
 - README 保持面向新用户，不复制完整手册；
 - 下载安装表必须和 Actions 真实产物名称一致；
-- 版本功能和 SHA-256 以 Release 和测试报告为准；
+- 版本功能、安装包和 SHA-256 以 GitHub Release 为准；
 - 不把 token、证书、API Key 或本地绝对路径写入公开文档；
 - UI 文案变化时同步更新快速开始和使用手册；
 - 平台限制必须明确区分“已原生测试”和“仅配置构建”。

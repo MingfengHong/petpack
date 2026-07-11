@@ -65,6 +65,8 @@ Open [Releases](https://github.com/MingfengHong/petpack/releases) and choose the
 
 Community builds are not commercially code-signed. See [troubleshooting](https://mingfenghong.github.io/petpack/troubleshooting) for SmartScreen, Gatekeeper, and Linux permission guidance.
 
+Actual runtime testing has currently been completed on Windows and Linux only. The macOS installers are built on native CI runners but have not yet been validated on physical Macs.
+
 ## Three steps
 
 1. **Import** a folder or ZIP containing `pet.json` and a spritesheet, or enter a Petdex slug.

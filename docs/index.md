@@ -50,4 +50,4 @@ features:
 
 ## 文档地图
 
-第一次使用从[快速开始](getting-started.md)进入；需要逐项理解界面和产物时阅读[完整使用手册](user-guide.md)。宠物作者应重点阅读[宠物包格式](PET_FORMATS.md)，公开分发前请同时查看[常见问题与排错](troubleshooting.md)和[测试报告](TEST_REPORT.md)。
+第一次使用从[快速开始](getting-started.md)进入；需要逐项理解界面和产物时阅读[完整使用手册](user-guide.md)。宠物作者应重点阅读[宠物包格式](PET_FORMATS.md)，公开分发前请同时查看[常见问题与排错](troubleshooting.md)。

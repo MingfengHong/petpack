@@ -14,7 +14,6 @@
 | `DOCKER.md` | Docker Web Studio |
 | `development.md` | 开发、测试和工作流 |
 | `troubleshooting.md` | 安装、运行和构建排错 |
-| `TEST_REPORT.md` | 当前版本测试证据 |
 | `site-maintenance.md` | 文档发布与维护规则 |
 
 ## 本地预览

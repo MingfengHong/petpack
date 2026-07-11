@@ -79,6 +79,8 @@ PetPack 不伪装跨操作系统编译能力：当前平台可直接生成原生
 
 当前构建未配置商业代码签名。Windows SmartScreen、macOS Gatekeeper 和 Linux 执行权限处理见[常见问题与排错](https://mingfenghong.github.io/petpack/troubleshooting)。
 
+当前仅在 Windows 和 Linux 完成实际运行测试；macOS 安装包由原生 CI 构建，尚未完成实体设备运行验收。
+
 ## 三步生成桌宠
 
 1. **导入**：选择包含 `pet.json` 和 spritesheet 的文件夹或 ZIP，也可以输入 Petdex slug。
@@ -159,8 +161,6 @@ npm run docs:dev
 - `pet.json` 最大 256 KiB，spritesheet 最大 16 MiB。
 - Petdex 在线导入只接受 `https://assets.petdex.dev` 资源。
 - 本地导入和桌宠运行时不访问 `~/.codex`，也不执行宠物包中的脚本。
-
-详细验证证据见[测试报告](https://mingfenghong.github.io/petpack/TEST_REPORT)。
 
 ## 参考与许可证
 

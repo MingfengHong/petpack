@@ -54,7 +54,6 @@ export default defineConfig({
         items: [
           { text: "开发和发布构建", link: "/development" },
           { text: "常见问题与排错", link: "/troubleshooting" },
-          { text: "测试报告", link: "/TEST_REPORT" },
           { text: "文档站维护", link: "/site-maintenance" },
         ],
       },
