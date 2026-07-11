@@ -12,6 +12,8 @@
 </p>
 
 <p align="center">
+  <a href="https://modelscope.cn/studios/HongMingfeng/petpack">在线版</a>
+  ·
   <a href="https://mingfenghong.github.io/petpack/">文档站</a>
   ·
   <a href="https://github.com/MingfengHong/petpack/releases">下载安装包</a>
@@ -19,8 +21,6 @@
   <a href="https://mingfenghong.github.io/petpack/getting-started">快速开始</a>
   ·
   <a href="https://mingfenghong.github.io/petpack/CROSS_PLATFORM">跨平台分发</a>
-  ·
-  <a href="https://mingfenghong.github.io/petpack/DOCKER">Docker Web 版</a>
 </p>
 
 <p align="center">
