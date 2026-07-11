@@ -55,7 +55,7 @@ Rust 回归覆盖父目录单宠物解析、清单路径穿越、错误图集、
 | --- | --- | --- |
 | TypeScript 与 Rust 回归 | \`env TMPDIR=$PWD/.tmp npm test\` | 11 passed，0 failed，1 ignored |
 | Petdex 联网测试 | `cargo test ... downloads_the_petdex_boba_package -- --ignored` | 1 passed，0 failed |
-| Linux 打包 | `env TMPDIR=/home/hyacinth/petpack/.tmp npm run tauri build -- --bundles appimage,deb --ci` | 生成 AppImage 与 DEB |
+| Linux 打包 | \`env TMPDIR=$PWD/.tmp npm run tauri build -- --bundles appimage,deb --ci\` | 生成 AppImage 与 DEB |
 | 动态依赖 | `ldd src-tauri/target/release/petpack-studio` | 无 `not found` 依赖 |
 | DEB 元数据 | `dpkg-deb --field ... Package Version Architecture Depends` | `pet-pack-studio` 0.3.1，amd64，依赖 `libayatana-appindicator3-1`、`libwebkit2gtk-4.1-0`、`libgtk-3-0` |
 | DEB 包内容 | `dpkg-deb -c` / `dpkg-deb --info` | 包含 `/usr/bin/petpack-studio`、桌面入口和 32/128/256@2 图标 |
