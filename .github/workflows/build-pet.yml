@@ -1,0 +1,81 @@
+name: build one pet for all desktop platforms
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: Public HTTPS URL of a PetPack cross-platform source ZIP
+        required: true
+        type: string
+
+jobs:
+  build-pet:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            build_args: --no-bundle
+            runtime: src-tauri/target/release/petpack-studio.exe
+            artifact: windows-x64
+          - platform: macos-latest
+            build_args: --bundles app
+            runtime: src-tauri/target/release/bundle/macos/PetPack Studio.app/Contents/MacOS/petpack-studio
+            artifact: macos-current
+          - platform: ubuntu-22.04
+            build_args: --no-bundle
+            runtime: src-tauri/target/release/petpack-studio
+            artifact: linux-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - name: Download and safely extract source kit
+        shell: bash
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
+        run: |
+          test "${SOURCE_URL#https://}" != "$SOURCE_URL"
+          curl --fail --location --proto '=https' --max-filesize 20971520 "$SOURCE_URL" --output pet-source.zip
+          python - <<'PY'
+          import os, pathlib, zipfile
+          root = pathlib.Path('pet-source').resolve()
+          root.mkdir()
+          with zipfile.ZipFile('pet-source.zip') as z:
+              for item in z.infolist():
+                  target = (root / item.filename).resolve()
+                  if root not in target.parents and target != root:
+                      raise SystemExit('unsafe ZIP path')
+              z.extractall(root)
+          manifests = list(root.rglob('petpack.bundle/pet.json'))
+          if len(manifests) != 1:
+              raise SystemExit('expected exactly one petpack.bundle/pet.json')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+              env.write(f"PET_SOURCE={manifests[0].parent.as_posix()}\n")
+          PY
+      - run: npm run tauri build -- ${{ matrix.build_args }} --ci
+      - name: Package native pet
+        shell: bash
+        run: |
+          mkdir -p relay-output
+          cargo run --manifest-path src-tauri/Cargo.toml --example pack_pet --release -- "$PET_SOURCE" "${{ matrix.runtime }}" relay-output
+      - uses: actions/upload-artifact@v6
+        with:
+          name: desktop-pet-${{ matrix.artifact }}
+          path: relay-output/*
+          if-no-files-found: error

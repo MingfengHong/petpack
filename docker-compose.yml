@@ -1,0 +1,12 @@
+services:
+  petpack-studio:
+    build:
+      context: ./server
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      PETPACK_BUILDERS_DIR: /app/builders
+    volumes:
+      - ./builder-runtimes:/app/builders:ro
+    restart: unless-stopped

@@ -1,0 +1,16 @@
+{
+  "name": "petpack-studio-server",
+  "private": true,
+  "version": "0.3.1",
+  "type": "module",
+  "scripts": {
+    "start": "node app.mjs",
+    "test": "node --test app.test.mjs"
+  },
+  "dependencies": {
+    "adm-zip": "0.5.16",
+    "express": "5.1.0",
+    "image-size": "2.0.2",
+    "multer": "2.2.0"
+  }
+}

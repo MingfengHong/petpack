@@ -1,0 +1,59 @@
+name: build lightweight relay builders
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["builder-v*"]
+
+jobs:
+  builder:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: --no-bundle
+            artifact: windows-x64
+          - platform: macos-latest
+            args: --bundles app
+            artifact: macos-current
+          - platform: ubuntu-22.04
+            args: --no-bundle
+            artifact: linux-current
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - run: npm run tauri build -- ${{ matrix.args }} --ci
+      - name: Stage lightweight builder
+        shell: bash
+        run: |
+          mkdir -p "builder-runtimes/${{ matrix.artifact }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp src-tauri/target/release/petpack-studio.exe "builder-runtimes/${{ matrix.artifact }}/petpack-builder.exe"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            cp -R "src-tauri/target/release/bundle/macos/PetPack Studio.app" "builder-runtimes/${{ matrix.artifact }}/PetPack Builder.app"
+          else
+            cp src-tauri/target/release/petpack-studio "builder-runtimes/${{ matrix.artifact }}/petpack-builder"
+            chmod +x "builder-runtimes/${{ matrix.artifact }}/petpack-builder"
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: petpack-builder-${{ matrix.artifact }}
+          path: builder-runtimes/${{ matrix.artifact }}
+          if-no-files-found: error
