@@ -2,29 +2,32 @@ import type { ImportedPet, PetStateId } from "./types";
 
 export const PET_STATES: Record<
   PetStateId,
-  { row: number; label: string; durations: number[] }
+  { row: number; label: string; labelEn: string; durations: number[] }
 > = {
-  idle: { row: 0, label: "待机", durations: [280, 110, 110, 140, 140, 320] },
+  idle: { row: 0, label: "待机", labelEn: "Idle", durations: [280, 110, 110, 140, 140, 320] },
   "running-right": {
     row: 1,
     label: "向右",
+    labelEn: "Run right",
     durations: [120, 120, 120, 120, 120, 120, 120, 220],
   },
   "running-left": {
     row: 2,
     label: "向左",
+    labelEn: "Run left",
     durations: [120, 120, 120, 120, 120, 120, 120, 220],
   },
-  waving: { row: 3, label: "挥手", durations: [140, 140, 140, 280] },
-  jumping: { row: 4, label: "跳跃", durations: [140, 140, 140, 140, 280] },
+  waving: { row: 3, label: "挥手", labelEn: "Wave", durations: [140, 140, 140, 280] },
+  jumping: { row: 4, label: "跳跃", labelEn: "Jump", durations: [140, 140, 140, 140, 280] },
   failed: {
     row: 5,
     label: "失落",
+    labelEn: "Failed",
     durations: [140, 140, 140, 140, 140, 140, 140, 240],
   },
-  waiting: { row: 6, label: "等待", durations: [150, 150, 150, 150, 150, 260] },
-  running: { row: 7, label: "工作", durations: [120, 120, 120, 120, 120, 220] },
-  review: { row: 8, label: "检查", durations: [150, 150, 150, 150, 150, 280] },
+  waiting: { row: 6, label: "等待", labelEn: "Wait", durations: [150, 150, 150, 150, 150, 260] },
+  running: { row: 7, label: "工作", labelEn: "Work", durations: [120, 120, 120, 120, 120, 220] },
+  review: { row: 8, label: "检查", labelEn: "Review", durations: [150, 150, 150, 150, 150, 280] },
 };
 
 export class SpritePlayer {

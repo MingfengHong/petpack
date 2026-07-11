@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PetPack Studio Online - inspect and prepare Codex pets for native desktop packaging." />
+    <title>PetPack Studio Online</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="PetPack Studio"><span class="brand-mark"><i></i><i></i></span><span><strong>PetPack</strong><small>STUDIO ONLINE</small></span></a>
+        <div class="top-actions"><span class="online-pill"><i></i><span data-i18n="online">在线服务</span></span><button id="language-button" class="language-button" type="button">EN</button></div>
+      </header>
+
+      <section class="hero" id="top">
+        <div><p class="eyebrow">CODEX PET → DESKTOP APP</p><h1 data-i18n-html="heroTitle">让你的 Codex 宠物<br><em>走出 Codex。</em></h1><p data-i18n="heroCopy">在浏览器中导入、校验和预览宠物，再导出可交给目标系统生成原生桌宠的接力包。</p></div>
+        <ol class="progress" aria-label="workflow">
+          <li class="active"><b>01</b><span><strong data-i18n="stepImport">导入</strong><small data-i18n="stepImportSub">选择宠物 ZIP</small></span></li>
+          <li id="progress-preview"><b>02</b><span><strong data-i18n="stepPreview">检查</strong><small data-i18n="stepPreviewSub">预览与校验</small></span></li>
+          <li id="progress-export"><b>03</b><span><strong data-i18n="stepExport">导出</strong><small data-i18n="stepExportSub">获取接力包</small></span></li>
+        </ol>
+      </section>
+
+      <main class="workspace">
+        <section class="panel import-panel">
+          <div class="panel-heading"><div><span>STEP 01</span><h2 data-i18n="importTitle">导入宠物</h2></div><small>Codex v2 · Petdex</small></div>
+          <input id="pet-file" type="file" accept=".zip,application/zip" hidden />
+          <button id="dropzone" class="dropzone" type="button">
+            <span class="drop-icon"><i></i><i></i><i></i></span>
+            <strong data-i18n="dropTitle">拖入或选择宠物 ZIP</strong>
+            <span data-i18n-html="dropCopy">需要包含 <code>pet.json</code> 与 <code>spritesheet.webp/png</code></span>
+            <em data-i18n="chooseZip">选择 ZIP 文件</em>
+          </button>
+          <p id="file-name" class="file-name" hidden></p>
+          <div id="status" class="status" role="status" aria-live="polite"></div>
+        </section>
+
+        <section id="preview-panel" class="panel preview-panel empty">
+          <div class="panel-heading"><div><span>STEP 02</span><h2 data-i18n="previewTitle">检查与预览</h2></div><small id="format-badge" data-i18n="waiting">等待导入</small></div>
+          <div id="preview-empty" class="preview-empty"><span class="empty-pet"></span><strong data-i18n="emptyTitle">宠物会在这里醒来</strong><p data-i18n="emptyCopy">导入后可逐行动画预览，并检查图集结构。</p></div>
+          <div id="preview-content" class="preview-content" hidden>
+            <div class="pet-stage"><div class="checkerboard"><div id="sprite-preview" class="sprite-preview"></div></div></div>
+            <div id="state-tabs" class="state-tabs"></div>
+            <div class="pet-summary"><div><strong id="pet-name"></strong><span id="pet-description"></span></div><span id="dimensions"></span></div>
+            <div id="validation-list" class="validation-list"></div>
+          </div>
+        </section>
+
+        <section class="panel export-panel">
+          <div class="panel-heading"><div><span>STEP 03</span><h2 data-i18n="exportTitle">导出接力包</h2></div><small data-i18n="allPlatforms">Windows · macOS · Linux</small></div>
+          <div class="export-layout">
+            <div class="meta-form">
+              <label><span data-i18n="appId">应用 ID</span><input id="field-id" placeholder="my-pet" disabled /></label>
+              <label><span data-i18n="displayName">显示名称</span><input id="field-name" disabled /></label>
+              <label class="full"><span data-i18n="description">描述</span><textarea id="field-description" rows="3" disabled></textarea></label>
+            </div>
+            <article class="relay-card">
+              <span class="relay-icon"><i></i><i></i><i></i></span>
+              <div><strong data-i18n="relayTitle">跨平台原生构建接力包</strong><p data-i18n="relayCopy">接收者在 Windows、macOS 或 Linux 上双击对应入口，即可生成该系统的原生桌宠。</p><div class="relay-flow"><span data-i18n="flow1">下载接力包</span><b>→</b><span data-i18n="flow2">目标系统解压</span><b>→</b><span data-i18n="flow3">一键生成</span></div></div>
+              <button id="package-button" type="button" disabled><span data-i18n="downloadRelay">下载接力包</span><small data-i18n="downloadRelaySub">含宠物数据、脚本与离线指引</small></button>
+            </article>
+          </div>
+          <p class="platform-note"><i>i</i><span data-i18n="platformNote">在线版不会把服务器容器视为目标 Linux 设备；原生应用始终由目标系统本机或原生 CI 构建。</span></p>
+        </section>
+      </main>
+      <footer><span>PetPack Studio 0.3.1</span><span data-i18n="footer">Local inspection · Native handoff · No Codex dependency</span></footer>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

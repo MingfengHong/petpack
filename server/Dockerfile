@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY app.mjs ./
+COPY public ./public
 RUN mkdir -p /app/builders && chown -R node:node /app
 USER node
 ENV PORT=8080 PETPACK_BUILDERS_DIR=/app/builders

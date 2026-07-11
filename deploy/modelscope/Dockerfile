@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY app.mjs ./
+COPY public ./public
 RUN mkdir -p /home/user/app/builders && chown -R node:node /home/user/app
 
 USER node

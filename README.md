@@ -2,6 +2,8 @@
   <img src="docs/assets/logo-compact.png" alt="PetPack Studio" width="640">
 </p>
 
+<p align="center"><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
+
 <p align="center">
   <strong>让你的 Codex 宠物走出 Codex。</strong>
 </p>
@@ -42,6 +44,8 @@
 - 桌宠支持 70%–140% 缩放、底部拖动、悬停工具栏和托盘尺寸菜单。
 - Studio 最小化后保留任务栏入口，关闭窗口直接退出进程。
 - 新增轻量跨平台构建包、原生 CI 构建矩阵和 Docker Web Studio。
+- Studio 与在线版支持中英文切换；在线版补齐动画预览和完整三步流程。
+- 接力包新增 Windows、macOS、Linux 一键入口与双语离线指引。
 
 ## 为什么需要 PetPack
 
@@ -59,7 +63,7 @@ PetPack 不伪装跨操作系统编译能力：当前平台可直接生成原生
 | 独立桌宠 | 透明无边框、置顶、可拖动、可缩放、托盘运行、不占任务栏。 |
 | 当前平台打包 | 生成便携目录、原生运行程序和 ZIP，不依赖 Codex。 |
 | 跨平台分发 | 导出宠物资源、轻量 builder 和目标设备构建指引。 |
-| Web Studio | 可通过 Docker 部署浏览器上传、校验和构建包下载服务。 |
+| Web Studio | 可通过 Docker 部署浏览器上传、动画预览、校验和接力包下载服务。 |
 
 ## 下载安装
 
@@ -120,7 +124,7 @@ Studio 提供两种发布方式：
 docker compose up --build -d
 ```
 
-打开 `http://localhost:8080`，上传宠物 ZIP，即可完成格式校验并下载跨平台构建包。Docker 部署边界和 builder 挂载方式见[Docker Web 版](https://mingfenghong.github.io/petpack/DOCKER)。
+打开 `http://localhost:8080`，上传宠物 ZIP，即可完成动画预览、格式校验并下载跨平台接力包。在线版不会把容器 Linux 当作目标设备生成“当前平台”桌宠；原生应用仍在目标系统或原生 CI 上构建。Docker 部署边界和 builder 挂载方式见[Docker Web 版](https://mingfenghong.github.io/petpack/DOCKER)。
 
 ## 从源码开发
 

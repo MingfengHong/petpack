@@ -10,6 +10,7 @@ const MAX_UPLOAD_BYTES = 18 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 256 * 1024;
 const MAX_SPRITE_BYTES = 16 * 1024 * 1024;
 const buildersDir = process.env.PETPACK_BUILDERS_DIR || "/app/builders";
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 
 export function safeEntryName(name) {
   const normalized = name.replaceAll("\\", "/");
@@ -59,6 +60,38 @@ export function parsePetZip(buffer) {
   return { manifest, sprite, spriteName, dimensions, rows };
 }
 
+export function previewPayload(parsed) {
+  const id = sanitizeId(parsed.manifest.id);
+  const displayName = String(parsed.manifest.displayName || id).slice(0, 100);
+  const description = String(parsed.manifest.description || "A standalone desktop companion.").slice(0, 500);
+  const mime = parsed.spriteName.toLowerCase().endsWith(".png") ? "image/png" : "image/webp";
+  const format = parsed.rows === 11 ? "Codex v2" : "Codex / Petdex v1";
+  const spriteVersionNumber = parsed.rows === 11 ? 2 : 1;
+  return {
+    id,
+    displayName,
+    description,
+    format,
+    spriteVersionNumber,
+    spritesheetPath: parsed.spriteName,
+    spriteDataUrl: `data:${mime};base64,${parsed.sprite.toString("base64")}`,
+    width: parsed.dimensions.width,
+    height: parsed.dimensions.height,
+    columns: 8,
+    rows: parsed.rows,
+    cellWidth: parsed.dimensions.width / 8,
+    cellHeight: parsed.dimensions.height / parsed.rows,
+    valid: true,
+    errors: [],
+    warnings: [],
+    checks: [
+      { label: "Manifest", ok: true, detail: `${displayName} · sprite v${spriteVersionNumber}` },
+      { label: "Spritesheet", ok: true, detail: `${parsed.dimensions.width}×${parsed.dimensions.height} · 8×${parsed.rows}` },
+      { label: "Security", ok: true, detail: "ZIP paths and referenced files passed validation" },
+    ],
+  };
+}
+
 async function addDirectory(zip, source, zipPrefix) {
   let entries;
   try {
@@ -99,32 +132,58 @@ export async function createRelayKit(parsed, fields = {}) {
     `${root}/build-request.json`,
     Buffer.from(JSON.stringify({ schemaVersion: 1, petId: id, displayName, description }, null, 2)),
   );
+  zip.addFile(`${root}/BUILD-WINDOWS.cmd`, Buffer.from(buildWindowsCommand()));
+  zip.addFile(`${root}/BUILD-MAC.command`, Buffer.from(buildMacCommand()), "", 0o100755 << 16);
+  zip.addFile(`${root}/BUILD-LINUX.sh`, Buffer.from(buildLinuxCommand()), "", 0o100755 << 16);
   zip.addFile(`${root}/build-here.ps1`, Buffer.from(buildHerePowerShell()));
-  zip.addFile(`${root}/build-here.sh`, Buffer.from(buildHereShell()));
+  zip.addFile(`${root}/build-here.sh`, Buffer.from(buildHereShell()), "", 0o100755 << 16);
+  zip.addFile(`${root}/START-HERE.html`, Buffer.from(relayStartHere(id)));
   zip.addFile(`${root}/README.md`, Buffer.from(relayReadme(id)));
   const builderCount = await addDirectory(zip, buildersDir, `${root}/builders`);
   return { id, displayName, builderCount, buffer: zip.toBuffer() };
 }
 
 function buildHerePowerShell() {
-  return `$ErrorActionPreference = 'Stop'\n$root = Split-Path -Parent $MyInvocation.MyCommand.Path\n$builder = Join-Path $root 'builders\\windows-x64\\petpack-builder.exe'\nif (-not (Test-Path -LiteralPath $builder)) { throw '缺少 Windows 构建器。' }\n& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output (Join-Path $root 'output')\nif ($LASTEXITCODE -ne 0) { throw "构建失败，退出码 $LASTEXITCODE" }\nWrite-Host '构建完成，请查看 output 目录。'\n`;
+  return `$ErrorActionPreference = 'Stop'\n$root = Split-Path -Parent $MyInvocation.MyCommand.Path\n$builder = Join-Path $root 'builders\\windows-x64\\petpack-builder.exe'\n$output = Join-Path $root 'output'\nWrite-Host 'PetPack: 正在检查 Windows 构建器 / Checking the Windows builder...' -ForegroundColor Cyan\nif (-not (Test-Path -LiteralPath $builder)) { throw '此接力包没有 Windows 构建器。请打开 START-HERE.html，按“缺少构建器”指引操作。 / Windows builder is missing. Open START-HERE.html.' }\n& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output $output\nif ($LASTEXITCODE -ne 0) { throw "构建失败 / Build failed (exit code $LASTEXITCODE)" }\nWrite-Host '构建完成！正在打开 output 文件夹。 / Build complete. Opening output...' -ForegroundColor Green\nStart-Process explorer.exe -ArgumentList $output\n`;
 }
 
 function buildHereShell() {
-  return `#!/usr/bin/env sh\nset -eu\nROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\ncase "$(uname -s)" in\n  Darwin) BUILDER="$ROOT/builders/macos-current/PetPack Builder.app/Contents/MacOS/petpack-studio" ;;\n  Linux) BUILDER="$ROOT/builders/linux-current/petpack-builder" ;;\n  *) echo '不支持的系统。' >&2; exit 2 ;;\nesac\n[ -x "$BUILDER" ] || { echo '缺少当前系统构建器。' >&2; exit 2; }\n"$BUILDER" build-pet --source "$ROOT/petpack.bundle" --output "$ROOT/output"\necho '构建完成，请查看 output 目录。'\n`;
+  return `#!/usr/bin/env sh\nset -eu\nROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\ncase "$(uname -s)" in\n  Darwin) BUILDER="$ROOT/builders/macos-current/PetPack Builder.app/Contents/MacOS/petpack-studio" ;;\n  Linux) BUILDER="$ROOT/builders/linux-current/petpack-builder" ;;\n  *) echo '不支持的系统 / Unsupported system.' >&2; exit 2 ;;\nesac\nif [ ! -f "$BUILDER" ]; then echo '当前系统构建器缺失。请打开 START-HERE.html。 / Builder missing. Open START-HERE.html.' >&2; exit 2; fi\nchmod +x "$BUILDER" 2>/dev/null || true\n"$BUILDER" build-pet --source "$ROOT/petpack.bundle" --output "$ROOT/output"\necho '构建完成 / Build complete: output/'\ncase "$(uname -s)" in Darwin) open "$ROOT/output" ;; Linux) command -v xdg-open >/dev/null && xdg-open "$ROOT/output" >/dev/null 2>&1 || true ;; esac\n`;
+}
+
+function buildWindowsCommand() {
+  return `@echo off\r\nchcp 65001 >nul\r\ntitle PetPack one-click builder\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0build-here.ps1"\r\nif errorlevel 1 (\r\n  echo.\r\n  echo Build did not finish. Open START-HERE.html for help.\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho PetPack build complete.\r\npause\r\n`;
+}
+
+function buildMacCommand() {
+  return `#!/bin/sh\ncd "$(dirname "$0")"\nchmod +x ./build-here.sh\n./build-here.sh\nSTATUS=$?\necho\n[ $STATUS -eq 0 ] && echo 'PetPack build complete.' || echo 'Build did not finish. Open START-HERE.html for help.'\necho 'Press Return to close this window.'\nread _\nexit $STATUS\n`;
+}
+
+function buildLinuxCommand() {
+  return `#!/bin/sh\ncd "$(dirname "$0")"\nchmod +x ./build-here.sh\nexec ./build-here.sh\n`;
+}
+
+function relayStartHere(id) {
+  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${id} · PetPack</title><style>body{margin:0;background:#f3efe7;color:#262a27;font:16px/1.65 system-ui,sans-serif}.wrap{max-width:900px;margin:auto;padding:48px 24px}h1{font:600 42px Georgia,serif;margin:0}.lead{color:#6f746d}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}.card,.help{background:#fffdf8;border:1px solid #ded9ce;border-radius:16px;padding:22px;box-shadow:0 10px 30px #2a261f0d}.card b{display:block;color:#1e7a66;font-size:18px}.card code{display:block;margin:12px 0;padding:9px;background:#e5f1ec;border-radius:8px;word-break:break-all}.help{border-left:5px solid #f05d3f}.help a{color:#1e7a66}small{color:#777}@media(max-width:720px){.grid{grid-template-columns:1fr}h1{font-size:34px}}</style><body><main class="wrap"><small>PetPack cross-platform handoff kit</small><h1>${id}</h1><p class="lead">选择接收电脑的系统，运行对应入口。无需安装 Codex，也无需打开完整 Studio。<br>Choose the recipient computer's OS and run its launcher. Codex and the full Studio are not required.</p><section class="grid"><article class="card"><b>Windows</b><code>BUILD-WINDOWS.cmd</code><span>双击运行。若 SmartScreen 提示，选择“更多信息”后确认运行。<br>Double-click it; confirm More info if SmartScreen appears.</span></article><article class="card"><b>macOS</b><code>BUILD-MAC.command</code><span>右键文件并选择“打开”。首次运行可能需要在“隐私与安全性”中确认。<br>Right-click and choose Open on first launch.</span></article><article class="card"><b>Linux</b><code>BUILD-LINUX.sh</code><span>允许作为程序执行后双击；或在终端运行 <code>chmod +x BUILD-LINUX.sh && ./BUILD-LINUX.sh</code></span></article></section><section class="help"><b>提示：没有对应系统的构建器？ / Missing builder?</b><p>打开 <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack 原生云构建</a>，由 Windows、macOS、Linux 原生 runner 生成；也可以从 PetPack Builder 发布产物补入 <code>builders/</code>。不能用 Windows 程序直接生成 macOS 应用。</p><p>Open <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack native cloud build</a>, or place the matching PetPack Builder release under <code>builders/</code>. A Windows executable cannot directly produce a macOS app.</p></section><p class="lead">成功后会自动打开 <code>output/</code>；请把其中完整 ZIP 发给桌宠使用者。</p></main></body></html>`;
 }
 
 function relayReadme(id) {
-  return `# ${id} 跨平台接力包\n\n接收者无需打开完整 Studio：运行当前系统的 build-here 脚本，即可在本机生成原生桌宠。\n\n构建器必须与目标系统匹配；Linux Docker 不能直接产生可签名的 macOS .app。服务器可挂载由原生 CI runner 预构建的 builders 目录。\n`;
+  return `# ${id} · PetPack 跨平台接力包\n\n请先双击打开 \`START-HERE.html\`。\n\n- Windows：双击 \`BUILD-WINDOWS.cmd\`\n- macOS：右键 \`BUILD-MAC.command\`，选择“打开”\n- Linux：运行 \`BUILD-LINUX.sh\`\n\n成功后会自动打开 \`output/\`。接收者不需要 Codex 或完整 Studio。构建器必须与目标系统匹配；缺失时请使用 START-HERE 中的原生云构建。\n\n## English\n\nOpen \`START-HERE.html\` first, then run the launcher for your OS. The finished native pet appears in \`output/\`. Codex and the full Studio are not required. If the matching builder is absent, follow the native cloud build link in START-HERE.\n`;
 }
-
-const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>PetPack Studio Server</title><style>body{font:15px system-ui;background:#f5f0e7;color:#242723;margin:0}.box{max-width:720px;margin:8vh auto;background:#fffdf8;padding:32px;border:1px solid #ded6c8;border-radius:20px;box-shadow:0 18px 50px #2a221522}h1{font-family:Georgia,serif;font-size:38px;margin:0 0 10px}p{color:#6d6d65;line-height:1.7}label{display:block;margin:14px 0 6px;font-weight:700}input{box-sizing:border-box;width:100%;padding:11px;border:1px solid #d7d0c3;border-radius:9px}button{margin-top:20px;width:100%;padding:13px;border:0;border-radius:10px;background:#db6848;color:white;font-weight:800}.note{background:#eef5f1;padding:12px;border-radius:10px;font-size:13px}</style><body><main class="box"><h1>PetPack Studio Server</h1><p>上传 Codex/Petdex ZIP，服务器只在内存中校验并返回跨平台接力包。</p><form method="post" action="/api/package" enctype="multipart/form-data"><label>宠物 ZIP</label><input type="file" name="pet" accept=".zip" required><label>应用 ID（可选）</label><input name="id" placeholder="my-pet"><label>显示名称（可选）</label><input name="displayName"><label>描述（可选）</label><input name="description"><button>校验并生成接力包</button></form><p class="note">Docker 版不把上传内容持久化。若管理员挂载了 Windows/macOS/Linux builders，返回包会包含对应轻量构建器。</p></main></body></html>`;
 
 export function createApp() {
   const app = express();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
-  app.get("/", (_request, response) => response.type("html").send(html));
+  app.use(express.static(publicDir));
   app.get("/healthz", (_request, response) => response.json({ ok: true }));
+  app.post("/api/inspect", upload.single("pet"), (request, response, next) => {
+    try {
+      if (!request.file) throw new Error("请选择宠物 ZIP。");
+      response.json({ ok: true, pet: previewPayload(parsePetZip(request.file.buffer)) });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.post("/api/package", upload.single("pet"), async (request, response, next) => {
     try {
       if (!request.file) throw new Error("请选择宠物 ZIP。");

@@ -89,12 +89,16 @@ petpack-cross-platform/
 ├── petpack.bundle/
 ├── build-request.json
 ├── builders/
+├── START-HERE.html
+├── BUILD-WINDOWS.cmd
+├── BUILD-MAC.command
+├── BUILD-LINUX.sh
 ├── build-here.ps1
 ├── build-here.sh
 └── README.md
 ```
 
-目标设备运行对应脚本后，在 `output/` 中得到原生桌宠目录和 ZIP。构建器缺失时，可以从 GitHub Actions builder 产物补充。详见[跨平台构建与分发](CROSS_PLATFORM.md)。
+目标设备先打开 `START-HERE.html`，再双击对应系统的一键入口；成功后会自动打开 `output/`，其中包含原生桌宠目录和 ZIP。构建器缺失时，指引页会提供 GitHub 原生云构建入口。详见[跨平台构建与分发](CROSS_PLATFORM.md)。
 
 ## 独立桌宠交互
 

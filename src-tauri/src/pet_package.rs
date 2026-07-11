@@ -617,12 +617,33 @@ pub fn export_source_kit(request: ExportRequest) -> Result<SourceExportResult, S
     let current_builder =
         std::env::current_exe().map_err(|error| format!("无法定位构建器：{error}"))?;
     let included_builder = include_current_platform_builder(&current_builder, &folder)?;
+    fs::write(folder.join("BUILD-WINDOWS.cmd"), build_windows_command())
+        .map_err(io_error("无法写入 Windows 一键入口"))?;
+    fs::write(folder.join("BUILD-MAC.command"), build_mac_command())
+        .map_err(io_error("无法写入 macOS 一键入口"))?;
+    fs::write(folder.join("BUILD-LINUX.sh"), build_linux_command())
+        .map_err(io_error("无法写入 Linux 一键入口"))?;
     fs::write(folder.join("build-here.ps1"), build_here_powershell())
         .map_err(io_error("无法写入 Windows 构建脚本"))?;
     fs::write(folder.join("build-here.sh"), build_here_shell())
         .map_err(io_error("无法写入 macOS/Linux 构建脚本"))?;
+    fs::write(folder.join("START-HERE.html"), relay_start_here(&id))
+        .map_err(io_error("无法写入接力包快速指引"))?;
     fs::write(folder.join("README.md"), cross_platform_readme(&id))
         .map_err(io_error("无法写入跨平台构建说明"))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for script in ["BUILD-MAC.command", "BUILD-LINUX.sh", "build-here.sh"] {
+            let path = folder.join(script);
+            let mut permissions = fs::metadata(&path)
+                .map_err(io_error("无法读取接力脚本权限"))?
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).map_err(io_error("无法设置接力脚本权限"))?;
+        }
+    }
 
     let zip_path = folder.with_extension("zip");
     zip_folder(&folder, &zip_path)?;
@@ -677,12 +698,15 @@ fn build_here_powershell() -> &'static str {
     r#"$ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $builder = Join-Path $root 'builders\windows-x64\petpack-builder.exe'
+$output = Join-Path $root 'output'
+Write-Host 'PetPack: 正在检查 Windows 构建器 / Checking the Windows builder...' -ForegroundColor Cyan
 if (-not (Test-Path -LiteralPath $builder)) {
-  throw '此接力包没有 Windows 构建器。请从 PetPack Builder 发布页补入 builders/windows-x64/petpack-builder.exe。'
+  throw '此接力包没有 Windows 构建器。请打开 START-HERE.html，按“缺少构建器”指引操作。 / Windows builder is missing. Open START-HERE.html.'
 }
-& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output (Join-Path $root 'output')
-if ($LASTEXITCODE -ne 0) { throw "构建失败，退出码 $LASTEXITCODE" }
-Write-Host '构建完成，请查看 output 目录。'
+& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output $output
+if ($LASTEXITCODE -ne 0) { throw "构建失败 / Build failed (exit code $LASTEXITCODE)" }
+Write-Host '构建完成！正在打开 output 文件夹。 / Build complete. Opening output...' -ForegroundColor Green
+Start-Process explorer.exe -ArgumentList $output
 "#
 }
 
@@ -695,18 +719,41 @@ case "$(uname -s)" in
   Linux) BUILDER="$ROOT/builders/linux-current/petpack-builder" ;;
   *) echo '不支持的系统。' >&2; exit 2 ;;
 esac
-if [ ! -x "$BUILDER" ]; then
-  echo '接力包中没有当前系统构建器，请从 PetPack Builder 发布页补入 builders 对应目录。' >&2
+if [ ! -f "$BUILDER" ]; then
+  echo '当前系统构建器缺失。请打开 START-HERE.html。 / Builder missing. Open START-HERE.html.' >&2
   exit 2
 fi
+chmod +x "$BUILDER" 2>/dev/null || true
 "$BUILDER" build-pet --source "$ROOT/petpack.bundle" --output "$ROOT/output"
-echo '构建完成，请查看 output 目录。'
+echo '构建完成 / Build complete: output/'
+case "$(uname -s)" in
+  Darwin) open "$ROOT/output" ;;
+  Linux) command -v xdg-open >/dev/null && xdg-open "$ROOT/output" >/dev/null 2>&1 || true ;;
+esac
 "#
+}
+
+fn build_windows_command() -> &'static str {
+    "@echo off\r\nchcp 65001 >nul\r\ntitle PetPack one-click builder\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"%~dp0build-here.ps1\"\r\nif errorlevel 1 (\r\n  echo.\r\n  echo Build did not finish. Open START-HERE.html for help.\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho PetPack build complete.\r\npause\r\n"
+}
+
+fn build_mac_command() -> &'static str {
+    "#!/bin/sh\ncd \"$(dirname \"$0\")\"\nchmod +x ./build-here.sh\n./build-here.sh\nSTATUS=$?\necho\n[ $STATUS -eq 0 ] && echo 'PetPack build complete.' || echo 'Build did not finish. Open START-HERE.html for help.'\necho 'Press Return to close this window.'\nread _\nexit $STATUS\n"
+}
+
+fn build_linux_command() -> &'static str {
+    "#!/bin/sh\ncd \"$(dirname \"$0\")\"\nchmod +x ./build-here.sh\nexec ./build-here.sh\n"
+}
+
+fn relay_start_here(id: &str) -> String {
+    format!(
+        r#"<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{id} · PetPack</title><style>body{{margin:0;background:#f3efe7;color:#262a27;font:16px/1.65 system-ui,sans-serif}}.wrap{{max-width:900px;margin:auto;padding:48px 24px}}h1{{font:600 42px Georgia,serif;margin:0}}.lead{{color:#6f746d}}.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}}.card,.help{{background:#fffdf8;border:1px solid #ded9ce;border-radius:16px;padding:22px;box-shadow:0 10px 30px #2a261f0d}}.card b{{display:block;color:#1e7a66;font-size:18px}}.card code{{display:block;margin:12px 0;padding:9px;background:#e5f1ec;border-radius:8px;word-break:break-all}}.help{{border-left:5px solid #f05d3f}}.help a{{color:#1e7a66}}small{{color:#777}}@media(max-width:720px){{.grid{{grid-template-columns:1fr}}h1{{font-size:34px}}}}</style><body><main class="wrap"><small>PetPack cross-platform handoff kit</small><h1>{id}</h1><p class="lead">选择接收电脑的系统，运行对应入口。无需安装 Codex，也无需打开完整 Studio。<br>Choose the recipient computer's OS and run its launcher. Codex and the full Studio are not required.</p><section class="grid"><article class="card"><b>Windows</b><code>BUILD-WINDOWS.cmd</code><span>双击运行。若 SmartScreen 提示，选择“更多信息”后确认运行。<br>Double-click it; confirm More info if SmartScreen appears.</span></article><article class="card"><b>macOS</b><code>BUILD-MAC.command</code><span>右键文件并选择“打开”。首次运行可能需要在“隐私与安全性”中确认。<br>Right-click and choose Open on first launch.</span></article><article class="card"><b>Linux</b><code>BUILD-LINUX.sh</code><span>允许作为程序执行后双击；或在终端运行 <code>chmod +x BUILD-LINUX.sh &amp;&amp; ./BUILD-LINUX.sh</code></span></article></section><section class="help"><b>提示：没有对应系统的构建器？ / Missing builder?</b><p>打开 <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack 原生云构建</a>，由 Windows、macOS、Linux 原生 runner 生成；也可以从 PetPack Builder 发布产物补入 <code>builders/</code>。不能用 Windows 程序直接生成 macOS 应用。</p><p>Open <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack native cloud build</a>, or place the matching PetPack Builder release under <code>builders/</code>. A Windows executable cannot directly produce a macOS app.</p></section><p class="lead">成功后会自动打开 <code>output/</code>；请把其中完整 ZIP 发给桌宠使用者。</p></main></body></html>"#
+    )
 }
 
 fn cross_platform_readme(id: &str) -> String {
     format!(
-        "# {id} 跨平台接力包\n\n此包包含宠物数据、当前发送者平台的轻量命令构建器和本机生成脚本。\n\n- Windows：右键 `build-here.ps1`，选择使用 PowerShell 运行。\n- macOS/Linux：终端执行 `chmod +x build-here.sh && ./build-here.sh`。\n- 如果 builders 中没有接收者平台的构建器，需要从 PetPack Builder 发布产物补入；不能用 Windows 可执行文件直接生成 macOS `.app`。\n- 构建结果位于 `output/`，不需要启动完整 Studio 界面。\n"
+        "# {id} · PetPack 跨平台接力包\n\n请先双击打开 `START-HERE.html`。\n\n- Windows：双击 `BUILD-WINDOWS.cmd`\n- macOS：右键 `BUILD-MAC.command`，选择“打开”\n- Linux：运行 `BUILD-LINUX.sh`\n\n成功后会自动打开 `output/`。接收者不需要 Codex 或完整 Studio。构建器必须与目标系统匹配；缺失时请使用 START-HERE 中的原生云构建。\n\n## English\n\nOpen `START-HERE.html` first, then run the launcher for your OS. The finished native pet appears in `output/`. Codex and the full Studio are not required. If the matching builder is absent, follow the native cloud build link in START-HERE.\n"
     )
 }
 
@@ -1263,6 +1310,10 @@ mod tests {
         assert!(folder.join("build-request.json").is_file());
         assert!(folder.join("build-here.ps1").is_file());
         assert!(folder.join("build-here.sh").is_file());
+        assert!(folder.join("BUILD-WINDOWS.cmd").is_file());
+        assert!(folder.join("BUILD-MAC.command").is_file());
+        assert!(folder.join("BUILD-LINUX.sh").is_file());
+        assert!(folder.join("START-HERE.html").is_file());
         assert!(Path::new(&result.zip_path).is_file());
         assert!(!result.included_builder.is_empty());
         fs::remove_dir_all(root).unwrap();

@@ -18,7 +18,10 @@ PetPack 提供两种可验证的跨平台路径：目标设备轻量构建，或
 1. 在 Studio 导入并验证宠物。
 2. 在“发布桌宠”区域选择“导出跨平台构建包”。
 3. 将生成的 ZIP 分发到目标设备。
-4. 解压后运行 `build-here.ps1`（Windows）或 `build-here.sh`（macOS/Linux）。
+4. 解压后双击 `START-HERE.html`，按接收设备选择一键入口：
+   - Windows：双击 `BUILD-WINDOWS.cmd`；
+   - macOS：右键 `BUILD-MAC.command` 并选择“打开”；
+   - Linux：运行 `BUILD-LINUX.sh`。
 5. 在 `output/` 获取原生桌宠目录和 ZIP。
 
 构建包结构：
@@ -28,12 +31,18 @@ petpack-cross-platform/
 ├── petpack.bundle/
 ├── build-request.json
 ├── builders/
+├── START-HERE.html
+├── BUILD-WINDOWS.cmd
+├── BUILD-MAC.command
+├── BUILD-LINUX.sh
 ├── build-here.ps1
 ├── build-here.sh
 └── README.md
 ```
 
-接收端不需要完整 Studio，也不需要 Codex。
+接收端不需要完整 Studio，也不需要 Codex。一键入口会检查构建器、执行构建并在成功后自动打开 `output/`；失败时终端窗口会保留明确错误，不会一闪而过。
+
+如果接力包没有接收系统对应的 builder，`START-HERE.html` 会引导使用 GitHub Actions 原生 runner，或补入对应 PetPack Builder。Windows 可执行文件不能直接生成 macOS `.app`。
 
 ## GitHub Actions 原生构建
 
@@ -71,4 +80,4 @@ petpack-cross-platform/
 
 ## Docker 的作用
 
-Docker Web Studio 负责上传、校验和生成跨平台构建包。容器中可以挂载预构建 builder，但 Linux 容器本身不负责生成或签名 macOS 原生应用。详见 [Docker Web 版](DOCKER.md)。
+Docker Web Studio 提供与桌面版一致的导入、校验、逐行动画预览和接力包导出流程，但不显示“构建当前 Linux 平台”。容器中可以挂载由原生 runner 预构建的 builder；容器 Linux 不被视为用户的目标设备，也不负责生成或签名 macOS 原生应用。详见 [Docker Web 版](DOCKER.md)。
