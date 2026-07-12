@@ -98,7 +98,7 @@ petpack-cross-platform/
 └── README.md
 ```
 
-目标设备先打开 `START-HERE.html`，再双击对应系统的一键入口；成功后会自动打开 `output/`，其中包含原生桌宠目录和 ZIP。构建器缺失时，指引页会提供 GitHub 原生云构建入口。详见[跨平台构建与分发](CROSS_PLATFORM.md)。
+目标设备先打开 `START-HERE.html`，再双击对应系统的一键入口；成功后会自动打开 `output/`，其中包含原生桌宠目录和 ZIP。构建器缺失时会在首次运行自动下载；失败时指引页会提供手动下载入口。详见[跨平台构建与分发](CROSS_PLATFORM.md)。
 
 ## 独立桌宠交互
 

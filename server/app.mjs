@@ -13,6 +13,7 @@ const MAX_PETDEX_INDEX_BYTES = 4 * 1024 * 1024;
 const PETDEX_MANIFEST_URL = "https://assets.petdex.dev/manifests/petdex-v1.json";
 const PETDEX_ASSET_HOST = "assets.petdex.dev";
 const PETDEX_CACHE_TTL_MS = 5 * 60 * 1000;
+const BUILDER_RELEASE_BASE = "https://github.com/MingfengHong/petpack/releases/download/builder-v0.3.1";
 const buildersDir = process.env.PETPACK_BUILDERS_DIR || "/app/builders";
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 let petdexManifestCache = null;
@@ -264,7 +265,7 @@ export async function createRelayKit(parsed, fields = {}) {
   zip.addFile(`${root}/BUILD-WINDOWS.cmd`, Buffer.from(buildWindowsCommand()));
   zip.addFile(`${root}/BUILD-MAC.command`, Buffer.from(buildMacCommand()), "", 0o100755 << 16);
   zip.addFile(`${root}/BUILD-LINUX.sh`, Buffer.from(buildLinuxCommand()), "", 0o100755 << 16);
-  zip.addFile(`${root}/build-here.ps1`, Buffer.from(buildHerePowerShell()));
+  zip.addFile(`${root}/build-here.ps1`, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(buildHerePowerShell())]));
   zip.addFile(`${root}/build-here.sh`, Buffer.from(buildHereShell()), "", 0o100755 << 16);
   zip.addFile(`${root}/START-HERE.html`, Buffer.from(relayStartHere(id)));
   zip.addFile(`${root}/README.md`, Buffer.from(relayReadme(id)));
@@ -273,11 +274,65 @@ export async function createRelayKit(parsed, fields = {}) {
 }
 
 function buildHerePowerShell() {
-  return `$ErrorActionPreference = 'Stop'\n$root = Split-Path -Parent $MyInvocation.MyCommand.Path\n$builder = Join-Path $root 'builders\\windows-x64\\petpack-builder.exe'\n$output = Join-Path $root 'output'\nWrite-Host 'PetPack: 正在检查 Windows 构建器 / Checking the Windows builder...' -ForegroundColor Cyan\nif (-not (Test-Path -LiteralPath $builder)) { throw '此接力包没有 Windows 构建器。请打开 START-HERE.html，按“缺少构建器”指引操作。 / Windows builder is missing. Open START-HERE.html.' }\n& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output $output\nif ($LASTEXITCODE -ne 0) { throw "构建失败 / Build failed (exit code $LASTEXITCODE)" }\nWrite-Host '构建完成！正在打开 output 文件夹。 / Build complete. Opening output...' -ForegroundColor Green\nStart-Process explorer.exe -ArgumentList $output\n`;
+  return `$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$builderRoot = Join-Path $root 'builders'
+$builder = Join-Path $builderRoot 'windows-x64\\petpack-builder.exe'
+$output = Join-Path $root 'output'
+Write-Host 'PetPack: 正在检查 Windows 构建器 / Checking the Windows builder...' -ForegroundColor Cyan
+if (-not (Test-Path -LiteralPath $builder)) {
+  $assetName = 'petpack-builder-windows-x64.zip'
+  $archive = Join-Path ([IO.Path]::GetTempPath()) ('petpack-builder-' + [guid]::NewGuid().ToString('N') + '.zip')
+  Write-Host '首次运行：正在下载轻量构建器 / First run: downloading the lightweight builder...' -ForegroundColor Cyan
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    New-Item -ItemType Directory -Force -Path $builderRoot | Out-Null
+    Invoke-WebRequest -UseBasicParsing -Uri ('${BUILDER_RELEASE_BASE}/' + $assetName) -OutFile $archive
+    Expand-Archive -LiteralPath $archive -DestinationPath $builderRoot -Force
+  } catch {
+    throw ('无法下载 Windows 构建器，请检查网络后重试。 / Could not download the Windows builder. ' + $_.Exception.Message)
+  } finally {
+    Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+  }
+}
+if (-not (Test-Path -LiteralPath $builder)) { throw 'Windows 构建器下载后仍未找到，请重新下载接力包。 / Windows builder is still missing after download.' }
+& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output $output
+if ($LASTEXITCODE -ne 0) { throw "构建失败 / Build failed (exit code $LASTEXITCODE)" }
+Write-Host '构建完成！正在打开 output 文件夹。 / Build complete. Opening output...' -ForegroundColor Green
+Start-Process explorer.exe -ArgumentList $output
+`;
 }
 
 function buildHereShell() {
-  return `#!/usr/bin/env sh\nset -eu\nROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\ncase "$(uname -s)" in\n  Darwin) BUILDER="$ROOT/builders/macos-current/PetPack Builder.app/Contents/MacOS/petpack-studio" ;;\n  Linux) BUILDER="$ROOT/builders/linux-current/petpack-builder" ;;\n  *) echo '不支持的系统 / Unsupported system.' >&2; exit 2 ;;\nesac\nif [ ! -f "$BUILDER" ]; then echo '当前系统构建器缺失。请打开 START-HERE.html。 / Builder missing. Open START-HERE.html.' >&2; exit 2; fi\nchmod +x "$BUILDER" 2>/dev/null || true\n"$BUILDER" build-pet --source "$ROOT/petpack.bundle" --output "$ROOT/output"\necho '构建完成 / Build complete: output/'\ncase "$(uname -s)" in Darwin) open "$ROOT/output" ;; Linux) command -v xdg-open >/dev/null && xdg-open "$ROOT/output" >/dev/null 2>&1 || true ;; esac\n`;
+  return `#!/usr/bin/env sh
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+RELEASE_BASE='${BUILDER_RELEASE_BASE}'
+OS=$(uname -s)
+ARCH=$(uname -m)
+case "$OS:$ARCH" in
+  Darwin:arm64|Darwin:aarch64) KEY='macos-arm64'; BUILDER="$ROOT/builders/macos-arm64/PetPack Builder.app/Contents/MacOS/petpack-studio" ;;
+  Darwin:x86_64) KEY='macos-x64'; BUILDER="$ROOT/builders/macos-x64/PetPack Builder.app/Contents/MacOS/petpack-studio" ;;
+  Linux:x86_64|Linux:amd64) KEY='linux-x64'; BUILDER="$ROOT/builders/linux-x64/petpack-builder" ;;
+  *) echo '当前系统或架构暂不支持 / Unsupported system or architecture.' >&2; exit 2 ;;
+esac
+if [ ! -f "$BUILDER" ]; then
+  command -v curl >/dev/null 2>&1 || { echo '需要 curl 才能下载构建器 / curl is required.' >&2; exit 2; }
+  ARCHIVE="\${TMPDIR:-/tmp}/petpack-builder-$KEY-$$.tar.gz"
+  trap 'rm -f "$ARCHIVE"' EXIT INT TERM
+  mkdir -p "$ROOT/builders"
+  echo '首次运行：正在下载轻量构建器 / First run: downloading the lightweight builder...'
+  curl --fail --location --retry 2 --proto '=https' "$RELEASE_BASE/petpack-builder-$KEY.tar.gz" --output "$ARCHIVE"
+  tar -xzf "$ARCHIVE" -C "$ROOT/builders"
+fi
+if [ ! -f "$BUILDER" ]; then echo '构建器下载后仍未找到 / Builder is still missing after download.' >&2; exit 2; fi
+chmod +x "$BUILDER" 2>/dev/null || true
+if [ "$OS" = 'Darwin' ]; then xattr -dr com.apple.quarantine "$(dirname "$(dirname "$(dirname "$BUILDER")")")" 2>/dev/null || true; fi
+"$BUILDER" build-pet --source "$ROOT/petpack.bundle" --output "$ROOT/output"
+echo '构建完成 / Build complete: output/'
+case "$OS" in Darwin) open "$ROOT/output" ;; Linux) command -v xdg-open >/dev/null && xdg-open "$ROOT/output" >/dev/null 2>&1 || true ;; esac
+`;
 }
 
 function buildWindowsCommand() {
@@ -293,11 +348,11 @@ function buildLinuxCommand() {
 }
 
 function relayStartHere(id) {
-  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${id} · PetPack</title><style>body{margin:0;background:#f3efe7;color:#262a27;font:16px/1.65 system-ui,sans-serif}.wrap{max-width:900px;margin:auto;padding:48px 24px}h1{font:600 42px Georgia,serif;margin:0}.lead{color:#6f746d}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}.card,.help{background:#fffdf8;border:1px solid #ded9ce;border-radius:16px;padding:22px;box-shadow:0 10px 30px #2a261f0d}.card b{display:block;color:#1e7a66;font-size:18px}.card code{display:block;margin:12px 0;padding:9px;background:#e5f1ec;border-radius:8px;word-break:break-all}.help{border-left:5px solid #f05d3f}.help a{color:#1e7a66}small{color:#777}@media(max-width:720px){.grid{grid-template-columns:1fr}h1{font-size:34px}}</style><body><main class="wrap"><small>PetPack cross-platform handoff kit</small><h1>${id}</h1><p class="lead">选择接收电脑的系统，运行对应入口。无需安装 Codex，也无需打开完整 Studio。<br>Choose the recipient computer's OS and run its launcher. Codex and the full Studio are not required.</p><section class="grid"><article class="card"><b>Windows</b><code>BUILD-WINDOWS.cmd</code><span>双击运行。若 SmartScreen 提示，选择“更多信息”后确认运行。<br>Double-click it; confirm More info if SmartScreen appears.</span></article><article class="card"><b>macOS</b><code>BUILD-MAC.command</code><span>右键文件并选择“打开”。首次运行可能需要在“隐私与安全性”中确认。<br>Right-click and choose Open on first launch.</span></article><article class="card"><b>Linux</b><code>BUILD-LINUX.sh</code><span>允许作为程序执行后双击；或在终端运行 <code>chmod +x BUILD-LINUX.sh && ./BUILD-LINUX.sh</code></span></article></section><section class="help"><b>提示：没有对应系统的构建器？ / Missing builder?</b><p>打开 <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack 原生云构建</a>，由 Windows、macOS、Linux 原生 runner 生成；也可以从 PetPack Builder 发布产物补入 <code>builders/</code>。不能用 Windows 程序直接生成 macOS 应用。</p><p>Open <a href="https://github.com/MingfengHong/petpack/actions/workflows/build-pet.yml">PetPack native cloud build</a>, or place the matching PetPack Builder release under <code>builders/</code>. A Windows executable cannot directly produce a macOS app.</p></section><p class="lead">成功后会自动打开 <code>output/</code>；请把其中完整 ZIP 发给桌宠使用者。</p></main></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${id} · PetPack</title><style>body{margin:0;background:#f3efe7;color:#262a27;font:16px/1.65 system-ui,sans-serif}.wrap{max-width:900px;margin:auto;padding:48px 24px}h1{font:600 42px Georgia,serif;margin:0}.lead{color:#6f746d}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}.card,.help{background:#fffdf8;border:1px solid #ded9ce;border-radius:16px;padding:22px;box-shadow:0 10px 30px #2a261f0d}.card b{display:block;color:#1e7a66;font-size:18px}.card code{display:block;margin:12px 0;padding:9px;background:#e5f1ec;border-radius:8px;word-break:break-all}.help{border-left:5px solid #f05d3f}.help a{color:#1e7a66}small{color:#777}@media(max-width:720px){.grid{grid-template-columns:1fr}h1{font-size:34px}}</style><body><main class="wrap"><small>PetPack cross-platform handoff kit</small><h1>${id}</h1><p class="lead">选择接收电脑的系统，运行对应入口。无需安装 Codex，也无需打开完整 Studio。<br>Choose the recipient computer's OS and run its launcher. Codex and the full Studio are not required.</p><section class="grid"><article class="card"><b>Windows</b><code>BUILD-WINDOWS.cmd</code><span>双击运行；首次运行会自动下载约 14 MB 的轻量构建器。<br>Double-click it; the lightweight builder downloads automatically on first run.</span></article><article class="card"><b>macOS</b><code>BUILD-MAC.command</code><span>右键文件并选择“打开”；首次运行会自动下载匹配芯片的构建器。<br>Right-click and choose Open; the matching builder downloads on first run.</span></article><article class="card"><b>Linux</b><code>BUILD-LINUX.sh</code><span>允许作为程序执行后双击；或在终端运行 <code>chmod +x BUILD-LINUX.sh && ./BUILD-LINUX.sh</code></span></article></section><section class="help"><b>首次运行需要网络 / Network required on first run</b><p>接力包保持轻量；若没有随包附带对应构建器，一键入口会从 PetPack 的 <a href="https://github.com/MingfengHong/petpack/releases/tag/builder-v0.3.1">构建器发布页</a>自动下载。下载失败时请在该页面手动取得对应文件，解压到 <code>builders/</code>。</p><p>The handoff kit stays small. If the matching builder is not embedded, the launcher downloads it from the <a href="https://github.com/MingfengHong/petpack/releases/tag/builder-v0.3.1">PetPack builder release</a>. If automatic download fails, extract the matching asset into <code>builders/</code>.</p></section><p class="lead">成功后会自动打开 <code>output/</code>；请把其中完整 ZIP 发给桌宠使用者。</p></main></body></html>`;
 }
 
 function relayReadme(id) {
-  return `# ${id} · PetPack 跨平台接力包\n\n请先双击打开 \`START-HERE.html\`。\n\n- Windows：双击 \`BUILD-WINDOWS.cmd\`\n- macOS：右键 \`BUILD-MAC.command\`，选择“打开”\n- Linux：运行 \`BUILD-LINUX.sh\`\n\n成功后会自动打开 \`output/\`。接收者不需要 Codex 或完整 Studio。构建器必须与目标系统匹配；缺失时请使用 START-HERE 中的原生云构建。\n\n## English\n\nOpen \`START-HERE.html\` first, then run the launcher for your OS. The finished native pet appears in \`output/\`. Codex and the full Studio are not required. If the matching builder is absent, follow the native cloud build link in START-HERE.\n`;
+  return `# ${id} · PetPack 跨平台接力包\n\n请先双击打开 \`START-HERE.html\`。\n\n- Windows：双击 \`BUILD-WINDOWS.cmd\`\n- macOS：右键 \`BUILD-MAC.command\`，选择“打开”\n- Linux：运行 \`BUILD-LINUX.sh\`\n\n成功后会自动打开 \`output/\`。接收者不需要 Codex 或完整 Studio。为保持接力包轻量，缺少对应构建器时首次运行会从 PetPack GitHub Release 自动下载。\n\n## English\n\nOpen \`START-HERE.html\` first, then run the launcher for your OS. The finished native pet appears in \`output/\`. Codex and the full Studio are not required. To keep the kit small, the matching builder downloads automatically from the PetPack GitHub Release when it is not embedded.\n`;
 }
 
 export function createApp() {

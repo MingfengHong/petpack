@@ -76,7 +76,7 @@ test("creates a browser preview payload", () => {
   assert.equal(pet.checks.length, 3);
 });
 
-test("relay kit contains beginner launchers and offline guidance", async () => {
+test("relay kit contains beginner launchers and builder bootstrap guidance", async () => {
   const kit = await createRelayKit(parsedFixture);
   const zip = new AdmZip(kit.buffer);
   const names = zip.getEntries().map((entry) => entry.entryName);
@@ -90,6 +90,12 @@ test("relay kit contains beginner launchers and offline guidance", async () => {
     "build-here.sh",
     "README.md",
   ]) assert.ok(names.includes(`${root}${name}`), `${name} should be present`);
+  const powershell = zip.readFile(`${root}build-here.ps1`);
+  const shell = zip.readAsText(`${root}build-here.sh`);
+  assert.deepEqual([...powershell.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.match(powershell.toString("utf8"), /petpack-builder-windows-x64\.zip/);
+  assert.match(shell, /petpack-builder-macos-arm64\.tar\.gz|petpack-builder-\$KEY\.tar\.gz/);
+  assert.match(shell, /petpack-builder-\$KEY\.tar\.gz/);
 });
 
 test("serves the full Online Studio UI", async (context) => {

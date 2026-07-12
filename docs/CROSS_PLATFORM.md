@@ -40,9 +40,9 @@ petpack-cross-platform/
 └── README.md
 ```
 
-接收端不需要完整 Studio，也不需要 Codex。一键入口会检查构建器、执行构建并在成功后自动打开 `output/`；失败时终端窗口会保留明确错误，不会一闪而过。
+接收端不需要完整 Studio，也不需要 Codex。一键入口会检查构建器；若接力包未携带对应版本，首次运行会从固定的 PetPack Builder Release 自动下载，随后执行构建并打开 `output/`。失败时终端窗口会保留明确错误，不会一闪而过。
 
-如果接力包没有接收系统对应的 builder，`START-HERE.html` 会引导使用 GitHub Actions 原生 runner，或补入对应 PetPack Builder。Windows 可执行文件不能直接生成 macOS `.app`。
+首次自动下载需要能访问 GitHub Release。下载失败时，`START-HERE.html` 会给出构建器发布页，可手动下载并解压到 `builders/`。Windows 可执行文件仍不能直接生成 macOS `.app`；macOS 构建器会按 Apple Silicon 或 Intel 自动选择。
 
 ## GitHub Actions 原生构建
 

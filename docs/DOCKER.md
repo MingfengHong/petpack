@@ -51,11 +51,12 @@ Compose 把根目录的 `builder-runtimes/` 只读挂载到 `/app/builders`：
 ```text
 builder-runtimes/
 ├── windows-x64/petpack-builder.exe
-├── macos-current/PetPack Builder.app/...
-└── linux-current/petpack-builder
+├── macos-arm64/PetPack Builder.app/...
+├── macos-x64/PetPack Builder.app/...
+└── linux-x64/petpack-builder
 ```
 
-存在这些文件时，Web Studio 返回的构建包会自动携带可用 builder。builder 可以从 `build-builders.yml` 的 GitHub Actions 产物下载。
+存在这些文件时，Web Studio 返回的构建包会自动携带可用 builder。未挂载时接力包仍可使用，一键入口会在目标设备首次运行时从 PetPack Builder Release 下载匹配架构。
 
 ## 生产部署建议
 

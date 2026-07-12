@@ -48,7 +48,7 @@ PetPack does not pretend native cross-compilation is universal. It builds the cu
 | Animation preview | Preview all 9 standard actions; v2 pets also support 16 look directions. |
 | Standalone desktop pet | Transparent, frameless, always-on-top, draggable, scalable, tray-hosted, and absent from the taskbar. |
 | Current-platform build | Produces a portable folder, native executable, and ZIP without Codex. |
-| Cross-platform handoff | Exports pet data, a lightweight builder, one-click launchers, and an offline guide. |
+| Cross-platform handoff | Exports pet data and one-click launchers; a missing builder downloads on first run. |
 | Online Studio | Docker-hosted import, validation, animated preview, and handoff-kit download. |
 
 ## Download
@@ -101,7 +101,7 @@ The handoff ZIP contains `START-HERE.html` and obvious launchers:
 - macOS: right-click `BUILD-MAC.command` and choose Open.
 - Linux: run `BUILD-LINUX.sh`.
 
-The native pet appears under `output/`. If the matching builder is absent, the offline guide links to the repository's native cloud build workflow. See [cross-platform delivery](https://mingfenghong.github.io/petpack/CROSS_PLATFORM) for details.
+The native pet appears under `output/`. If the matching builder is absent, the launcher downloads the matching PetPack Builder release on first run. See [cross-platform delivery](https://mingfenghong.github.io/petpack/CROSS_PLATFORM) for details.
 
 ## Docker Online Studio
 

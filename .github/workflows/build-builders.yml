@@ -17,11 +17,16 @@ jobs:
             args: --no-bundle
             artifact: windows-x64
           - platform: macos-latest
-            args: --bundles app
-            artifact: macos-current
+            args: --target aarch64-apple-darwin --bundles app
+            artifact: macos-arm64
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin --bundles app
+            artifact: macos-x64
+            target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: --no-bundle
-            artifact: linux-current
+            artifact: linux-x64
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
@@ -35,11 +40,15 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
       - run: npm ci
       - run: npm run tauri build -- ${{ matrix.args }} --ci
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
       - name: Stage lightweight builder
         shell: bash
         run: |
@@ -47,13 +56,21 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp src-tauri/target/release/petpack-studio.exe "builder-runtimes/${{ matrix.artifact }}/petpack-builder.exe"
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            cp -R "src-tauri/target/release/bundle/macos/PetPack Studio.app" "builder-runtimes/${{ matrix.artifact }}/PetPack Builder.app"
+            cp -R "src-tauri/target/${{ matrix.target }}/release/bundle/macos/PetPack Studio.app" "builder-runtimes/${{ matrix.artifact }}/PetPack Builder.app"
           else
             cp src-tauri/target/release/petpack-studio "builder-runtimes/${{ matrix.artifact }}/petpack-builder"
             chmod +x "builder-runtimes/${{ matrix.artifact }}/petpack-builder"
           fi
+      - name: Archive Windows builder
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "builder-runtimes/${{ matrix.artifact }}" -DestinationPath "petpack-builder-${{ matrix.artifact }}.zip"
+      - name: Archive macOS/Linux builder
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -czf "petpack-builder-${{ matrix.artifact }}.tar.gz" -C builder-runtimes "${{ matrix.artifact }}"
       - uses: actions/upload-artifact@v6
         with:
           name: petpack-builder-${{ matrix.artifact }}
-          path: builder-runtimes/${{ matrix.artifact }}
+          path: petpack-builder-${{ matrix.artifact }}.*
           if-no-files-found: error
