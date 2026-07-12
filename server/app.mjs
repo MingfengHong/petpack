@@ -128,19 +128,30 @@ async function readResponseLimited(response, limit, label) {
   return Buffer.concat(chunks, length);
 }
 
-async function fetchPetdexAsset(value, limit, label, fetchImpl = fetch) {
+export async function fetchPetdexAsset(value, limit, label, fetchImpl = fetch) {
   const url = trustedPetdexAssetUrl(value);
-  let response;
-  try {
-    response = await fetchImpl(url, {
-      redirect: "error",
-      headers: { "User-Agent": "PetPack-Studio/0.3.1", Referer: "https://petdex.dev/" },
-      signal: AbortSignal.timeout(20_000),
-    });
-  } catch (error) {
-    throw new Error(`下载 ${label} 失败：${error.message || error}`);
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        redirect: "error",
+        headers: { "User-Agent": "PetPack-Studio/0.3.1", Referer: "https://petdex.dev/" },
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) break;
+    }
+    if (response) {
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 2) return readResponseLimited(response, limit, label);
+      await response.body?.cancel();
+      lastError = new Error(`HTTP ${response.status}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 250 : 750));
   }
-  return readResponseLimited(response, limit, label);
+  throw new Error(`下载 ${label} 失败：${lastError?.message || lastError}`);
 }
 
 async function loadPetdexManifest(fetchImpl = fetch) {

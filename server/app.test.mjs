@@ -4,6 +4,7 @@ import AdmZip from "adm-zip";
 import {
   createApp,
   createRelayKit,
+  fetchPetdexAsset,
   parsePetdexSlug,
   previewPayload,
   safeEntryName,
@@ -33,6 +34,22 @@ test("accepts only HTTPS Petdex asset URLs without credentials or ports", () => 
   assert.throws(() => trustedPetdexAssetUrl("http://assets.petdex.dev/curated/boba/pet.json"));
   assert.throws(() => trustedPetdexAssetUrl("https://assets.petdex.dev.evil.test/pet.json"));
   assert.throws(() => trustedPetdexAssetUrl("https://user:pass@assets.petdex.dev/pet.json"));
+});
+
+test("retries transient Petdex asset failures", async () => {
+  let attempts = 0;
+  const bytes = await fetchPetdexAsset(
+    "https://assets.petdex.dev/curated/boba/pet.json",
+    1024,
+    "fixture",
+    async () => {
+      attempts += 1;
+      if (attempts < 3) throw new Error("temporary network failure");
+      return new Response("ok");
+    },
+  );
+  assert.equal(bytes.toString(), "ok");
+  assert.equal(attempts, 3);
 });
 
 test("adm-zip dependency is available", () => {
