@@ -63,5 +63,7 @@ test("serves the full Online Studio UI", async (context) => {
   assert.equal(response.status, 200);
   assert.match(html, /sprite-preview/);
   assert.match(html, /language-button/);
+  assert.match(html, /https:\/\/github\.com\/MingfengHong\/petpack/);
+  assert.match(html, /class="github-link"/);
   assert.doesNotMatch(html, /构建当前 Linux/);
 });
