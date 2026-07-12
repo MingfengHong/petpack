@@ -115,6 +115,7 @@ let pet = null;
 let timer = 0;
 let currentState = "idle";
 let frame = 0;
+let currentStatus = null;
 
 const $ = (id) => document.getElementById(id);
 const tr = (key, values = {}) => {
@@ -130,12 +131,20 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => { node.placeholder = tr(node.dataset.i18nPlaceholder); });
   $("language-button").textContent = locale === "zh" ? "EN" : "中文";
   if (pet) renderPet(pet);
+  if (currentStatus?.key) {
+    status(tr(currentStatus.key, currentStatus.values), currentStatus.kind, currentStatus.key, currentStatus.values);
+  }
 }
 
-function status(message, kind) {
+function status(message, kind, key = null, values = {}) {
+  currentStatus = { kind, key, values };
   const node = $("status");
   node.textContent = message;
   node.className = `status visible ${kind}`;
+}
+
+function localizedStatus(key, kind, values = {}) {
+  status(tr(key, values), kind, key, values);
 }
 
 function stop() { clearTimeout(timer); }
@@ -217,7 +226,7 @@ async function inspectZip(selected) {
   source = { kind: "zip", file: selected };
   $("file-name").hidden = false;
   $("file-name").textContent = tr("selected", { name: selected.name });
-  status(tr("reading"), "loading");
+  localizedStatus("reading", "loading");
   const body = new FormData();
   body.append("pet", selected);
   try {
@@ -225,7 +234,7 @@ async function inspectZip(selected) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || tr("inspectFailed"));
     renderPet(result.pet);
-    status(tr("ready", { format: result.pet.format }), "success");
+    localizedStatus("ready", "success", { format: result.pet.format });
   } catch (error) {
     source = null;
     status(error.message || tr("inspectFailed"), "error");
@@ -235,11 +244,11 @@ async function inspectZip(selected) {
 async function inspectPetdex() {
   const input = $("petdex-input");
   if (!input.value.trim()) {
-    status(tr("petdexRequired"), "error");
+    localizedStatus("petdexRequired", "error");
     return;
   }
   $("petdex-button").disabled = true;
-  status(tr("readingPetdex"), "loading");
+  localizedStatus("readingPetdex", "loading");
   try {
     const response = await fetch("/api/petdex/inspect", {
       method: "POST",
@@ -252,7 +261,7 @@ async function inspectPetdex() {
     $("file-name").hidden = false;
     $("file-name").textContent = `Petdex · ${result.source.slug}`;
     renderPet(result.pet);
-    status(tr("ready", { format: result.pet.format }), "success");
+    localizedStatus("ready", "success", { format: result.pet.format });
   } catch (error) {
     source = null;
     status(error.message || tr("inspectFailed"), "error");
@@ -283,7 +292,7 @@ $("language-button").onclick = () => {
 
 $("package-button").onclick = async () => {
   if (!source || !pet) return;
-  status(tr("packaging"), "loading");
+  localizedStatus("packaging", "loading");
   $("package-button").disabled = true;
   const metadata = {
     id: $("field-id").value,
@@ -316,7 +325,7 @@ $("package-button").onclick = async () => {
     anchor.download = `${metadata.id || pet.id}-petpack-cross-platform.zip`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status(tr("downloaded"), "success");
+    localizedStatus("downloaded", "success");
   } catch (error) {
     status(error.message || tr("packageFailed"), "error");
   } finally {
