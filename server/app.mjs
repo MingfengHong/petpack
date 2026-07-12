@@ -9,8 +9,13 @@ import { fileURLToPath } from "node:url";
 const MAX_UPLOAD_BYTES = 18 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 256 * 1024;
 const MAX_SPRITE_BYTES = 16 * 1024 * 1024;
+const MAX_PETDEX_INDEX_BYTES = 4 * 1024 * 1024;
+const PETDEX_MANIFEST_URL = "https://assets.petdex.dev/manifests/petdex-v1.json";
+const PETDEX_ASSET_HOST = "assets.petdex.dev";
+const PETDEX_CACHE_TTL_MS = 5 * 60 * 1000;
 const buildersDir = process.env.PETPACK_BUILDERS_DIR || "/app/builders";
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
+let petdexManifestCache = null;
 
 export function safeEntryName(name) {
   const normalized = name.replaceAll("\\", "/");
@@ -33,6 +38,57 @@ export function sanitizeId(value) {
   return id || "pet";
 }
 
+export function parsePetdexSlug(value) {
+  const trimmed = String(value || "").trim().replace(/\/+$/, "");
+  let raw = trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    let url;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      throw new Error("Petdex 链接无效。");
+    }
+    if (url.protocol !== "https:" || !["petdex.dev", "www.petdex.dev", "petdex.crafter.run"].includes(url.hostname)) {
+      throw new Error("只接受 petdex.dev 的宠物链接。");
+    }
+    const parts = url.pathname.split("/").filter(Boolean);
+    raw = parts.at(-1) || "";
+  }
+  const slug = raw.toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(slug)) throw new Error("请输入有效的 Petdex slug 或宠物链接。");
+  return slug;
+}
+
+export function trustedPetdexAssetUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Petdex 返回了无效资源 URL。");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== PETDEX_ASSET_HOST ||
+    url.port ||
+    url.username ||
+    url.password
+  ) throw new Error("已拒绝非 Petdex 官方资源域名。");
+  return url;
+}
+
+function parsePetAssets(manifest, sprite, spriteName) {
+  const dimensions = imageSize(sprite);
+  const rows = dimensions.width === 1536 && dimensions.height === 2288 ? 11 : 9;
+  const validDimensions =
+    (dimensions.width === 1536 && dimensions.height === 2288) ||
+    (dimensions.width % 8 === 0 && dimensions.height % 9 === 0);
+  if (!validDimensions) throw new Error(`不支持的图集尺寸 ${dimensions.width}×${dimensions.height}。`);
+  if (rows === 11 && Number(manifest.spriteVersionNumber) !== 2) {
+    throw new Error("8×11 图集必须声明 spriteVersionNumber: 2。");
+  }
+  return { manifest, sprite, spriteName, dimensions, rows };
+}
+
 export function parsePetZip(buffer) {
   const zip = new AdmZip(buffer);
   const entries = zip.getEntries().map((entry) => ({ entry, name: safeEntryName(entry.entryName) }));
@@ -48,16 +104,78 @@ export function parsePetZip(buffer) {
   if (!spriteEntry) throw new Error("找不到 pet.json 指向的 spritesheet。");
   const sprite = spriteEntry.entry.getData();
   if (sprite.length > MAX_SPRITE_BYTES) throw new Error("spritesheet 超过 16 MiB。");
-  const dimensions = imageSize(sprite);
-  const rows = dimensions.width === 1536 && dimensions.height === 2288 ? 11 : 9;
-  const validDimensions =
-    (dimensions.width === 1536 && dimensions.height === 2288) ||
-    (dimensions.width % 8 === 0 && dimensions.height % 9 === 0);
-  if (!validDimensions) throw new Error(`不支持的图集尺寸 ${dimensions.width}×${dimensions.height}。`);
-  if (rows === 11 && Number(manifest.spriteVersionNumber) !== 2) {
-    throw new Error("8×11 图集必须声明 spriteVersionNumber: 2。");
+  return parsePetAssets(manifest, sprite, spriteName);
+}
+
+async function readResponseLimited(response, limit, label) {
+  if (!response.ok) throw new Error(`${label} 返回错误：HTTP ${response.status}。`);
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > limit) throw new Error(`${label} 超过允许的大小限制。`);
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error(`无法读取 ${label}。`);
+  const chunks = [];
+  let length = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > limit) {
+      await reader.cancel();
+      throw new Error(`${label} 超过允许的大小限制。`);
+    }
+    chunks.push(Buffer.from(value));
   }
-  return { manifest, sprite, spriteName, dimensions, rows };
+  return Buffer.concat(chunks, length);
+}
+
+async function fetchPetdexAsset(value, limit, label, fetchImpl = fetch) {
+  const url = trustedPetdexAssetUrl(value);
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      redirect: "error",
+      headers: { "User-Agent": "PetPack-Studio/0.3.1", Referer: "https://petdex.dev/" },
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    throw new Error(`下载 ${label} 失败：${error.message || error}`);
+  }
+  return readResponseLimited(response, limit, label);
+}
+
+async function loadPetdexManifest(fetchImpl = fetch) {
+  if (petdexManifestCache?.expiresAt > Date.now()) return petdexManifestCache.pets;
+  const bytes = await fetchPetdexAsset(PETDEX_MANIFEST_URL, MAX_PETDEX_INDEX_BYTES, "Petdex manifest", fetchImpl);
+  let manifest;
+  try {
+    manifest = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new Error("无法解析 Petdex manifest。");
+  }
+  if (!Array.isArray(manifest.pets)) throw new Error("Petdex manifest 缺少宠物列表。");
+  petdexManifestCache = { pets: manifest.pets, expiresAt: Date.now() + PETDEX_CACHE_TTL_MS };
+  return manifest.pets;
+}
+
+export async function downloadPetdexPackage(value, fetchImpl = fetch) {
+  const slug = parsePetdexSlug(value);
+  const pets = await loadPetdexManifest(fetchImpl);
+  const entry = pets.find((pet) => String(pet.slug || "").toLowerCase() === slug);
+  if (!entry) throw new Error(`Petdex 中没有找到 slug：${slug}`);
+  const spriteUrl = trustedPetdexAssetUrl(entry.spritesheetUrl);
+  trustedPetdexAssetUrl(entry.petJsonUrl);
+  const spriteName = spriteUrl.pathname.toLowerCase().endsWith(".png") ? "spritesheet.png" : "spritesheet.webp";
+  const [manifestBytes, sprite] = await Promise.all([
+    fetchPetdexAsset(entry.petJsonUrl, MAX_MANIFEST_BYTES, "pet.json", fetchImpl),
+    fetchPetdexAsset(entry.spritesheetUrl, MAX_SPRITE_BYTES, "spritesheet", fetchImpl),
+  ]);
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestBytes.toString("utf8"));
+  } catch {
+    throw new Error("Petdex pet.json 不是有效 JSON。");
+  }
+  return { slug, parsed: parsePetAssets(manifest, sprite, spriteName) };
 }
 
 export function previewPayload(parsed) {
@@ -175,6 +293,7 @@ export function createApp() {
   const app = express();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
   app.use(express.static(publicDir));
+  app.use(express.json({ limit: "4kb" }));
   app.get("/healthz", (_request, response) => response.json({ ok: true }));
   app.post("/api/inspect", upload.single("pet"), (request, response, next) => {
     try {
@@ -184,10 +303,30 @@ export function createApp() {
       next(error);
     }
   });
+  app.post("/api/petdex/inspect", async (request, response, next) => {
+    try {
+      const { slug, parsed } = await downloadPetdexPackage(request.body?.petdex);
+      response.json({ ok: true, source: { kind: "petdex", slug }, pet: previewPayload(parsed) });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.post("/api/package", upload.single("pet"), async (request, response, next) => {
     try {
       if (!request.file) throw new Error("请选择宠物 ZIP。");
       const parsed = parsePetZip(request.file.buffer);
+      const kit = await createRelayKit(parsed, request.body);
+      response.setHeader("Content-Type", "application/zip");
+      response.setHeader("Content-Disposition", `attachment; filename="${kit.id}-petpack-cross-platform.zip"`);
+      response.setHeader("X-PetPack-Builders", String(kit.builderCount));
+      response.send(kit.buffer);
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.post("/api/petdex/package", async (request, response, next) => {
+    try {
+      const { parsed } = await downloadPetdexPackage(request.body?.petdex);
       const kit = await createRelayKit(parsed, request.body);
       response.setHeader("Content-Type", "application/zip");
       response.setHeader("Content-Disposition", `attachment; filename="${kit.id}-petpack-cross-platform.zip"`);

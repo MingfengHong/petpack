@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import AdmZip from "adm-zip";
-import { createApp, createRelayKit, previewPayload, safeEntryName, sanitizeId } from "./app.mjs";
+import {
+  createApp,
+  createRelayKit,
+  parsePetdexSlug,
+  previewPayload,
+  safeEntryName,
+  sanitizeId,
+  trustedPetdexAssetUrl,
+} from "./app.mjs";
 
 test("sanitizes ids", () => {
   assert.equal(sanitizeId(" My Pet / 你好 "), "my-pet");
@@ -11,6 +19,20 @@ test("rejects traversal paths", () => {
   assert.throws(() => safeEntryName("../pet.json"));
   assert.throws(() => safeEntryName("C:\\pet.json"));
   assert.equal(safeEntryName("pet/pet.json"), "pet/pet.json");
+});
+
+test("accepts Petdex slugs and official pet URLs only", () => {
+  assert.equal(parsePetdexSlug("Boba"), "boba");
+  assert.equal(parsePetdexSlug("https://petdex.dev/pets/boba/"), "boba");
+  assert.throws(() => parsePetdexSlug("https://example.com/pets/boba"));
+  assert.throws(() => parsePetdexSlug("../../metadata"));
+});
+
+test("accepts only HTTPS Petdex asset URLs without credentials or ports", () => {
+  assert.equal(trustedPetdexAssetUrl("https://assets.petdex.dev/curated/boba/pet.json").hostname, "assets.petdex.dev");
+  assert.throws(() => trustedPetdexAssetUrl("http://assets.petdex.dev/curated/boba/pet.json"));
+  assert.throws(() => trustedPetdexAssetUrl("https://assets.petdex.dev.evil.test/pet.json"));
+  assert.throws(() => trustedPetdexAssetUrl("https://user:pass@assets.petdex.dev/pet.json"));
 });
 
 test("adm-zip dependency is available", () => {
@@ -65,5 +87,23 @@ test("serves the full Online Studio UI", async (context) => {
   assert.match(html, /language-button/);
   assert.match(html, /https:\/\/github\.com\/MingfengHong\/petpack/);
   assert.match(html, /class="github-link"/);
+  assert.match(html, /id="petdex-input"/);
+  assert.match(html, /id="petdex-button"/);
   assert.doesNotMatch(html, /构建当前 Linux/);
+});
+
+test("rejects invalid Petdex input before making an upstream request", async (context) => {
+  const server = createApp().listen(0, "127.0.0.1");
+  context.after(() => server.close());
+  await new Promise((resolve) => server.once("listening", resolve));
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/petdex/inspect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ petdex: "https://example.com/pets/boba" }),
+  });
+  const result = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /只接受 petdex\.dev/);
 });

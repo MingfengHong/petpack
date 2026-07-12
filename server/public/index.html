@@ -6,6 +6,7 @@
     <meta name="description" content="PetPack Studio Online - inspect and prepare Codex pets for native desktop packaging." />
     <title>PetPack Studio Online</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/petdex.css" />
   </head>
   <body>
     <div class="shell">
@@ -41,6 +42,12 @@
             <em data-i18n="chooseZip">选择 ZIP 文件</em>
           </button>
           <p id="file-name" class="file-name" hidden></p>
+          <div class="import-divider"><span data-i18n="petdexDivider">或者从 Petdex 导入</span></div>
+          <div class="petdex-form">
+            <span class="petdex-mark" aria-hidden="true">P</span>
+            <label><span data-i18n="petdexLabel">Petdex slug 或链接</span><input id="petdex-input" type="text" autocomplete="off" data-i18n-placeholder="petdexPlaceholder" placeholder="例如 boba 或 petdex.dev/pets/boba" /></label>
+            <button id="petdex-button" type="button" data-i18n="petdexButton">识别并导入</button>
+          </div>
           <div id="status" class="status" role="status" aria-live="polite"></div>
         </section>
 

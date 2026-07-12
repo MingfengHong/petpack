@@ -109,7 +109,7 @@ The native pet appears under `output/`. If the matching builder is absent, the o
 docker compose up --build -d
 ```
 
-Open `http://localhost:8080` to upload, inspect, preview, and export a handoff kit. The service intentionally does not treat its Linux container as a target Linux desktop; native applications are built on the target OS or a native CI runner.
+Open `http://localhost:8080` to upload a pet ZIP or enter a Petdex slug/URL, then inspect, preview, and export a handoff kit. Petdex import reads only from the official Petdex asset host and does not accept arbitrary download URLs. The service intentionally does not treat its Linux container as a target Linux desktop; native applications are built on the target OS or a native CI runner.
 
 ## Development
 

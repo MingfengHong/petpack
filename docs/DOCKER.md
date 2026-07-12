@@ -32,7 +32,9 @@ curl http://localhost:8080/healthz
 
 ## 上传要求
 
-Web Studio 接受包含 `pet.json` 和 PNG/WebP spritesheet 的 ZIP。上传内容在请求内存中处理，不写入持久化目录。
+Web Studio 接受包含 `pet.json` 和 PNG/WebP spritesheet 的 ZIP，也接受 Petdex slug 或 `petdex.dev/pets/<slug>` 页面链接。上传内容在请求内存中处理，不写入持久化目录。
+
+Petdex 导入只查询官方 manifest，并只下载 `https://assets.petdex.dev` 下的清单与图集；拒绝 HTTP、非官方域名、携带凭据或自定义端口的资源 URL。单次上游请求设置超时和流式大小限制。
 
 服务会拒绝：
 

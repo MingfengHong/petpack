@@ -126,7 +126,7 @@ Studio 提供两种发布方式：
 docker compose up --build -d
 ```
 
-打开 `http://localhost:8080`，上传宠物 ZIP，即可完成动画预览、格式校验并下载跨平台接力包。在线版不会把容器 Linux 当作目标设备生成“当前平台”桌宠；原生应用仍在目标系统或原生 CI 上构建。Docker 部署边界和 builder 挂载方式见[Docker Web 版](https://mingfenghong.github.io/petpack/DOCKER)。
+打开 `http://localhost:8080`，上传宠物 ZIP 或输入 Petdex slug/链接，即可完成动画预览、格式校验并下载跨平台接力包。在线版只从 Petdex 官方资产域读取资源，不抓取网页或接受任意下载地址。容器 Linux 不会被当作目标设备生成“当前平台”桌宠；原生应用仍在目标系统或原生 CI 上构建。Docker 部署边界和 builder 挂载方式见[Docker Web 版](https://mingfenghong.github.io/petpack/DOCKER)。
 
 ## 从源码开发
 
