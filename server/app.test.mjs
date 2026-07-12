@@ -94,6 +94,7 @@ test("relay kit contains beginner launchers and builder bootstrap guidance", asy
   const shell = zip.readAsText(`${root}build-here.sh`);
   assert.deepEqual([...powershell.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
   assert.match(powershell.toString("utf8"), /petpack-builder-windows-x64\.zip/);
+  assert.match(powershell.toString("utf8"), /Start-Process.+-Wait -PassThru/);
   assert.match(shell, /petpack-builder-macos-arm64\.tar\.gz|petpack-builder-\$KEY\.tar\.gz/);
   assert.match(shell, /petpack-builder-\$KEY\.tar\.gz/);
 });

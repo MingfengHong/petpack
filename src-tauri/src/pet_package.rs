@@ -726,8 +726,9 @@ if (-not (Test-Path -LiteralPath $builder)) {
   }
 }
 if (-not (Test-Path -LiteralPath $builder)) { throw 'Windows 构建器下载后仍未找到，请重新下载接力包。 / Windows builder is still missing after download.' }
-& $builder build-pet --source (Join-Path $root 'petpack.bundle') --output $output
-if ($LASTEXITCODE -ne 0) { throw "构建失败 / Build failed (exit code $LASTEXITCODE)" }
+$source = Join-Path $root 'petpack.bundle'
+$process = Start-Process -FilePath $builder -ArgumentList @('build-pet', '--source', ('"' + $source + '"'), '--output', ('"' + $output + '"')) -NoNewWindow -Wait -PassThru
+if ($process.ExitCode -ne 0) { throw "构建失败 / Build failed (exit code $($process.ExitCode))" }
 Write-Host '构建完成！正在打开 output 文件夹。 / Build complete. Opening output...' -ForegroundColor Green
 Start-Process explorer.exe -ArgumentList $output
 "#
@@ -1352,6 +1353,7 @@ mod tests {
         let shell = fs::read_to_string(folder.join("build-here.sh")).unwrap();
         assert!(powershell.starts_with(&[0xef, 0xbb, 0xbf]));
         assert!(String::from_utf8_lossy(&powershell).contains("petpack-builder-windows-x64.zip"));
+        assert!(String::from_utf8_lossy(&powershell).contains("-Wait -PassThru"));
         assert!(shell.contains("petpack-builder-$KEY.tar.gz"));
         assert!(Path::new(&result.zip_path).is_file());
         assert!(!result.included_builder.is_empty());
