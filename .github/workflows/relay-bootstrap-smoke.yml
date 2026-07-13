@@ -1,0 +1,70 @@
+name: relay bootstrap smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  relay:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - name: Create a builder-free Boba relay kit
+        shell: bash
+        run: |
+          mkdir -p relay-input
+          curl --fail --location --proto '=https' \
+            https://assets.petdex.dev/curated/boba/pet.json \
+            --output relay-input/pet.json
+          curl --fail --location --proto '=https' \
+            https://assets.petdex.dev/curated/boba/spritesheet.webp \
+            --output relay-input/spritesheet.webp
+          cd server
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import AdmZip from 'adm-zip';
+          import { createRelayKit, parsePetZip } from './app.mjs';
+          const input = path.resolve('../relay-input');
+          const source = new AdmZip();
+          source.addLocalFile(path.join(input, 'pet.json'));
+          source.addLocalFile(path.join(input, 'spritesheet.webp'));
+          const kit = await createRelayKit(parsePetZip(source.toBuffer()), {
+            id: 'relay-smoke',
+            displayName: 'Relay Smoke',
+          });
+          if (kit.builderCount !== 0) throw new Error('expected a builder-free relay kit');
+          const output = path.resolve('../relay-output');
+          fs.mkdirSync(output, { recursive: true });
+          new AdmZip(kit.buffer).extractAllTo(output, true);
+          NODE
+      - name: Run Windows one-click bootstrap
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: relay-output/relay-smoke-petpack-cross-platform
+        run: |
+          ./build-here.ps1
+          if (-not (Test-Path output/relay-smoke-desktop-pet-windows-x64.zip)) { throw 'Windows pet ZIP missing' }
+      - name: Run macOS/Linux one-click bootstrap
+        if: runner.os != 'Windows'
+        shell: bash
+        working-directory: relay-output/relay-smoke-petpack-cross-platform
+        run: |
+          chmod +x build-here.sh
+          ./build-here.sh
+          test -n "$(find output -maxdepth 1 -name 'relay-smoke-desktop-pet-*.zip' -print -quit)"
